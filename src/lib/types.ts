@@ -45,6 +45,14 @@ export interface Owner {
   initials: string
 }
 
+export type DuressBalanceMode = 'amount' | 'percent'
+
+export interface DuressSettings {
+  pin: string
+  mode: DuressBalanceMode
+  value: number
+}
+
 export interface BankingState {
   owner: Owner
   balance: number
@@ -52,7 +60,12 @@ export interface BankingState {
   monthlyBudget: number
   beneficiaries: Beneficiary[]
   transactions: Transaction[]
+  duress: DuressSettings
+  duressActive: boolean
+  duressBalance: number
 }
+
+export type UnlockResult = 'normal' | 'duress' | null
 
 export interface TransferInput {
   beneficiary: Beneficiary

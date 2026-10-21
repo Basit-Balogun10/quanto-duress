@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom'
 import { TransactionRow } from '@/components/TransactionRow'
 import {
+  selectAvailableBalance,
   selectMonthlyIncome,
   selectMonthlySpending,
   useBankingStore,
@@ -32,6 +33,7 @@ export function Dashboard() {
   const [showBalance, setShowBalance] = useState(true)
   const [copied, setCopied] = useState(false)
 
+  const availableBalance = selectAvailableBalance(state)
   const monthlySpending = selectMonthlySpending(state)
   const monthlyIncome = selectMonthlyIncome(state)
   const spendingPercentage = Math.min(
@@ -86,7 +88,7 @@ export function Dashboard() {
           </div>
 
           <p className="mt-3 font-display text-[clamp(2.8rem,9vw,4.5rem)] font-semibold leading-none tracking-[-0.055em]">
-            {showBalance ? formatNaira(state.balance) : '₦••••••'}
+            {showBalance ? formatNaira(availableBalance) : '₦••••••'}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-lumen/55">

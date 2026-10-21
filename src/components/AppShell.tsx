@@ -1,4 +1,4 @@
-import { House, ReceiptText, Settings2 } from 'lucide-react'
+import { House, LockKeyhole, ReceiptText, Settings2 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from './Logo'
 import { useBankingStore } from '@/lib/store'
@@ -10,7 +10,11 @@ const navItems = [
   { to: '/app/settings', label: 'Settings', icon: Settings2 },
 ]
 
-export function AppShell() {
+interface AppShellProps {
+  onLock: () => void
+}
+
+export function AppShell({ onLock }: AppShellProps) {
   const owner = useBankingStore((state) => state.owner)
 
   return (
@@ -57,6 +61,15 @@ export function AppShell() {
               <span className="text-sm font-medium">{owner.name}</span>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onLock}
+                aria-label="Lock app"
+                title="Lock app"
+                className="flex size-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:bg-lumen-deep hover:text-vast"
+              >
+                <LockKeyhole className="size-4" />
+              </button>
               <span className="hidden items-center gap-2 rounded-full border border-line bg-lumen-deep px-3 py-1.5 text-[0.7rem] font-medium text-fathom sm:flex">
                 <span className="size-1.5 rounded-full bg-success" />
                 Demo account

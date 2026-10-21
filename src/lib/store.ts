@@ -5,11 +5,19 @@ import {
   owner as seedOwner,
   seedTransactions,
 } from './fixtures'
-import type { BankingState, Beneficiary, Transaction } from './types'
+import type {
+  BankingState,
+  Beneficiary,
+  DuressSettings,
+  Transaction,
+  UnlockResult,
+} from './types'
 
 interface BankingStore extends BankingState {
   commitTransfer: (transaction: Transaction, beneficiary?: Beneficiary) => void
   setPin: (pin: string) => void
+  setDuressSettings: (settings: DuressSettings) => void
+  unlockWithPin: (pin: string) => UnlockResult
   resetDemo: () => void
 }
 
@@ -21,12 +29,27 @@ function createInitialState(): BankingState {
     monthlyBudget: 300000,
     beneficiaries: structuredClone(seedBeneficiaries),
     transactions: structuredClone(seedTransactions),
+    duress: {
+      pin: '9111',
+      mode: 'percent',
+      value: 20,
+    },
+    duressActive: false,
+    duressBalance: 0,
   }
+}
+
+function duressBalanceFor(balance: number, settings: DuressSettings) {
+  const value =
+    settings.mode === 'amount'
+      ? settings.value
+      : Math.round((balance * settings.value) / 100)
+  return Math.max(0, Math.min(Math.round(value), balance))
 }
 
 export const useBankingStore = create<BankingStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...createInitialState(),
 
       commitTransfer: (transaction, beneficiary) =>
@@ -41,6 +64,9 @@ export const useBankingStore = create<BankingStore>()(
 
           return {
             balance: state.balance - transaction.amount,
+            duressBalance: state.duressActive
+              ? Math.max(0, state.duressBalance - transaction.amount)
+              : state.duressBalance,
             transactions: [transaction, ...state.transactions],
             beneficiaries:
               beneficiary && !exists
@@ -50,6 +76,32 @@ export const useBankingStore = create<BankingStore>()(
         }),
 
       setPin: (pin) => set({ pin }),
+
+      setDuressSettings: (settings) =>
+        set((state) => (state.duressActive ? state : { duress: settings })),
+
+      unlockWithPin: (pin) => {
+        const state = get()
+
+        if (pin === state.pin) {
+          if (state.duressActive) {
+            set({ duressActive: false, duressBalance: 0 })
+          }
+          return 'normal'
+        }
+
+        if (pin === state.duress.pin && pin !== state.pin) {
+          if (!state.duressActive) {
+            set({
+              duressActive: true,
+              duressBalance: duressBalanceFor(state.balance, state.duress),
+            })
+          }
+          return 'duress'
+        }
+
+        return null
+      },
 
       resetDemo: () => set(createInitialState()),
     }),
@@ -65,6 +117,10 @@ function inCurrentMonth(value: string) {
   const date = new Date(value)
   const now = new Date()
   return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+}
+
+export function selectAvailableBalance(state: BankingState) {
+  return state.duressActive ? state.duressBalance : state.balance
 }
 
 export function selectMonthlySpending(state: BankingState) {

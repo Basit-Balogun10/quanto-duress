@@ -14,7 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PinInput } from '@/components/PinInput'
 import { TransferReceipt } from '@/components/TransferReceipt'
 import { submitTransfer, TransferError } from '@/lib/api'
-import { useBankingStore } from '@/lib/store'
+import { selectAvailableBalance, useBankingStore } from '@/lib/store'
 import type { Beneficiary, Transaction } from '@/lib/types'
 import { cn, formatNaira, initialsOf } from '@/lib/utils'
 
@@ -62,11 +62,12 @@ export function Transfer() {
   const [newBank, setNewBank] = useState(banks[0])
   const [newAccount, setNewAccount] = useState('')
 
+  const availableBalance = selectAvailableBalance(state)
   const filtered = state.beneficiaries.filter((beneficiary) =>
     `${beneficiary.name} ${beneficiary.bank}`.toLowerCase().includes(query.toLowerCase()),
   )
   const numericAmount = Number(amount) || 0
-  const overBalance = numericAmount > state.balance
+  const overBalance = numericAmount > availableBalance
 
   const activeStep = stepNumber(step)
 
@@ -169,7 +170,7 @@ export function Transfer() {
         <p className="text-sm text-muted">
           Available{' '}
           <span className="font-mono font-semibold text-vast">
-            {formatNaira(state.balance)}
+            {formatNaira(availableBalance)}
           </span>
         </p>
       </div>
@@ -420,7 +421,7 @@ export function Transfer() {
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
                 <span className="text-[0.68rem] text-muted">
-                  Available {formatNaira(state.balance)}
+                  Available {formatNaira(availableBalance)}
                 </span>
                 <span className="font-mono text-[0.6rem] text-muted">No fees</span>
               </div>
@@ -441,7 +442,9 @@ export function Transfer() {
 
             {overBalance && (
               <p className="mt-3 text-xs font-medium text-danger">
-                That is more than your available balance.
+                {availableBalance === 0
+                  ? 'This account has no money available to send.'
+                  : 'That is more than your available balance.'}
               </p>
             )}
 
@@ -580,9 +583,11 @@ export function Transfer() {
               </button>
             )}
 
-            <p className="mt-5 border-t border-line pt-3 text-center font-mono text-[0.56rem] uppercase tracking-wider text-muted/60">
-              Demo PIN: {state.pin}
-            </p>
+            {!state.duressActive && (
+              <p className="mt-5 border-t border-line pt-3 text-center font-mono text-[0.56rem] uppercase tracking-wider text-muted/60">
+                Demo PIN: {state.pin}
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { useBankingStore } from './store'
+import { selectAvailableBalance, useBankingStore } from './store'
 import type { Beneficiary, Transaction, TransferInput, TransferResult } from './types'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -18,14 +18,23 @@ export async function submitTransfer(input: TransferInput): Promise<TransferResu
 
   const state = useBankingStore.getState()
 
-  if (input.pin !== state.pin) {
+  const normalPin = input.pin === state.pin
+  const duressPin = state.duressActive && input.pin === state.duress.pin
+
+  if (!normalPin && !duressPin) {
     throw new TransferError('That PIN is not correct. Try again.')
   }
   if (input.amount <= 0) {
     throw new TransferError('Enter an amount greater than zero.')
   }
-  if (input.amount > state.balance) {
-    throw new TransferError('This amount is above your available balance.')
+
+  const available = selectAvailableBalance(state)
+  if (input.amount > available) {
+    throw new TransferError(
+      available === 0
+        ? 'There is no money available to send from this account.'
+        : 'This amount is above your available balance.',
+    )
   }
 
   const existing = state.beneficiaries.find(

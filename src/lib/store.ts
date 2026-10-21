@@ -104,16 +104,19 @@ export const useBankingStore = create<BankingStore>()(
       setPin: (pin) => set({ pin }),
 
       setDuressSettings: (settings) =>
-        set((state) =>
-          state.duressActive
-            ? state
-            : {
-                duress: settings,
-                duressActive: false,
-                duressBalance: 0,
-                duressTransactions: [],
-              },
-        ),
+        set((state) => {
+          if (state.duressActive) return state
+          return {
+            duress: settings,
+            duressActive: false,
+            duressBalance: 0,
+            duressTransactions: [],
+            silentFailure:
+              !settings && state.silentFailure?.recoveryUsesDuressPin
+                ? { ...state.silentFailure, recoveryUsesDuressPin: false }
+                : state.silentFailure,
+          }
+        }),
 
       setSilentFailureSettings: (settings) =>
         set({

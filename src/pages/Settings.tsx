@@ -5,16 +5,55 @@ import {
   Copy,
   KeyRound,
   Landmark,
+  Mic,
   Percent,
   RotateCcw,
   ShieldAlert,
   ShieldCheck,
+  Smartphone,
   UserRound,
+  WifiOff,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { RecoveryDialog } from '@/components/RecoveryDialog'
 import { useBankingStore } from '@/lib/store'
+import { motionSupported, requestMotionAccess, speechSupported } from '@/lib/triggers'
 import type { DuressBalanceMode, DuressHistoryMode } from '@/lib/types'
 import { cn, formatNaira } from '@/lib/utils'
+
+function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  checked: boolean
+  onChange: () => void
+  label: string
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onChange}
+      disabled={disabled}
+      className={cn(
+        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-40',
+        checked ? 'bg-fathom' : 'bg-lumen-dark',
+      )}
+    >
+      <span
+        className={cn(
+          'size-5 rounded-full bg-lumen shadow-sm transition-transform',
+          checked ? 'translate-x-5.5' : 'translate-x-0.5',
+        )}
+      />
+    </button>
+  )
+}
 
 function PinForm() {
   const pin = useBankingStore((state) => state.pin)
@@ -445,12 +484,333 @@ function DuressForm() {
   )
 }
 
+function SilentFailureForm() {
+  const silentFailure = useBankingStore((state) => state.silentFailure)
+  const duress = useBankingStore((state) => state.duress)
+  const pin = useBankingStore((state) => state.pin)
+  const setSilentFailureSettings = useBankingStore(
+    (state) => state.setSilentFailureSettings,
+  )
+  const configured = silentFailure !== null
+  const motionAvailable = motionSupported()
+  const voiceAvailable = speechSupported()
+
+  const [setupOpen, setSetupOpen] = useState(configured)
+  const [shake, setShake] = useState(silentFailure?.shake ?? true)
+  const [voice, setVoice] = useState(silentFailure?.voice ?? false)
+  const [phrase, setPhrase] = useState(silentFailure?.phrase ?? 'quanto hold')
+  const [recoverySame, setRecoverySame] = useState(
+    silentFailure ? silentFailure.recoveryUsesDuressPin : Boolean(duress),
+  )
+  const [recoveryPin, setRecoveryPin] = useState(silentFailure?.recoveryPin ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const recoveryUsesDuress = recoverySame && Boolean(duress)
+
+  const reset = () => {
+    setShake(true)
+    setVoice(false)
+    setPhrase('quanto hold')
+    setRecoverySame(Boolean(duress))
+    setRecoveryPin('')
+    setError(null)
+    setSaved(false)
+  }
+
+  const toggle = () => {
+    if (setupOpen) {
+      setSetupOpen(false)
+      if (configured) setSilentFailureSettings(null)
+      reset()
+      return
+    }
+    setSetupOpen(true)
+  }
+
+  const save = async () => {
+    setSaved(false)
+    setError(null)
+
+    const usableShake = shake && motionAvailable
+    const usableVoice = voice && voiceAvailable
+
+    if (!usableShake && !usableVoice && !duress) {
+      setError('Enable at least one trigger that this device supports.')
+      return
+    }
+    if (voice && phrase.trim().length < 2) {
+      setError('Enter a wake phrase with at least 2 characters.')
+      return
+    }
+
+    const recovery = recoveryUsesDuress ? duress?.pin : recoveryPin
+    if (!recovery || !/^\d{4}$/.test(recovery)) {
+      setError(
+        recoveryUsesDuress
+          ? 'Set up duress access before using its PIN for recovery.'
+          : 'Your recovery PIN must be exactly 4 digits.',
+      )
+      return
+    }
+    if (!recoveryUsesDuress && recovery === pin) {
+      setError('Choose a recovery PIN that is different from your transfer PIN.')
+      return
+    }
+
+    if (shake) {
+      setSaving(true)
+      const access = await requestMotionAccess()
+      setSaving(false)
+      if (access === 'denied') {
+        setError('Motion access was denied. Allow it in your browser settings.')
+        return
+      }
+    }
+
+    setSilentFailureSettings({
+      shake,
+      voice,
+      phrase: phrase.trim(),
+      recoveryPin: recovery,
+      recoveryUsesDuressPin: recoveryUsesDuress,
+    })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 2500)
+  }
+
+  const displayedRecovery = recoveryUsesDuress ? duress?.pin : recoveryPin
+
+  return (
+    <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-pulse-soft text-pulse">
+          <WifiOff className="size-4.5" />
+        </span>
+        <div>
+          <h2 className="font-display text-2xl font-semibold">Silent failure</h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            Opt in to a hidden safety mode. Once triggered, transfers stop with a realistic
+            network error until your recovery PIN is entered. It is off until you set it up.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-line bg-lumen-deep/40 px-4 py-3.5">
+        <div>
+          <p className="text-xs font-semibold">
+            {setupOpen
+              ? configured
+                ? 'Silent failure enabled'
+                : 'Finish setting up'
+              : 'Silent failure off'}
+          </p>
+          <p className="mt-0.5 text-[0.65rem] leading-relaxed text-muted">
+            {setupOpen
+              ? configured
+                ? 'Triggers are listening while the app is open.'
+                : 'Choose triggers and a recovery PIN below.'
+              : 'Transfers always behave normally until this is turned on.'}
+          </p>
+        </div>
+        <Switch
+          checked={setupOpen}
+          onChange={toggle}
+          label="Enable silent failure"
+        />
+      </div>
+
+      {setupOpen && (
+        <>
+          <div className="mt-5 overflow-hidden rounded-2xl border border-line">
+            <div className="flex items-center justify-between gap-4 border-b border-line bg-lumen-deep/30 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                  <Smartphone className="size-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold">Shake to fail</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-relaxed text-muted">
+                    {motionAvailable
+                      ? 'Three sharp shakes within a second trigger the failure.'
+                      : 'Motion sensors are unavailable on this device.'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={shake}
+                onChange={() => {
+                  setShake((value) => !value)
+                  setError(null)
+                }}
+                label="Toggle shake trigger"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 border-b border-line bg-lumen-deep/30 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                  <Mic className="size-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold">Wake phrase</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-relaxed text-muted">
+                    {voiceAvailable
+                      ? 'Listens while the app is open. Microphone permission may be requested.'
+                      : 'Voice recognition is unavailable in this browser.'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={voice}
+                onChange={() => {
+                  setVoice((value) => !value)
+                  setError(null)
+                }}
+                label="Toggle wake phrase trigger"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 bg-lumen-deep/30 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                  <KeyRound className="size-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold">Duress PIN on transfer</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-relaxed text-muted">
+                    {duress
+                      ? 'Entering your duress PIN on a transfer fails it instead of sending.'
+                      : 'Set up duress access above to enable this trigger.'}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={cn(
+                  'rounded-full px-3 py-1.5 text-[0.6rem] font-medium',
+                  duress
+                    ? 'bg-success-soft text-success'
+                    : 'bg-lumen-dark text-muted',
+                )}
+              >
+                {duress ? 'On' : 'Unavailable'}
+              </span>
+            </div>
+          </div>
+
+          {voice && (
+            <label className="mt-4 block">
+              <span className="text-[0.68rem] font-medium text-muted">Wake phrase</span>
+              <input
+                value={phrase}
+                onChange={(event) => {
+                  setPhrase(event.target.value.slice(0, 30))
+                  setError(null)
+                }}
+                autoComplete="off"
+                className="mt-2 w-full rounded-2xl border border-line bg-lumen-deep/40 px-4 py-3.5 text-sm outline-none transition-colors focus:border-fathom"
+              />
+              <span className="mt-1.5 block text-[0.62rem] text-muted">
+                Say this phrase anywhere in the app to trigger the failure.
+              </span>
+            </label>
+          )}
+
+          <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
+            <p className="label-mono text-[0.52rem] text-muted">Recovery PIN</p>
+            <p className="mt-1.5 text-[0.66rem] leading-relaxed text-muted">
+              Clears the blocked state and restores transfers. It stays active across
+              reloads until this PIN is entered.
+            </p>
+
+            {duress && (
+              <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-3.5">
+                <div>
+                  <p className="text-xs font-semibold">Use my duress PIN</p>
+                  <p className="mt-0.5 text-[0.64rem] text-muted">
+                    Default. Turn off to choose a separate recovery PIN.
+                  </p>
+                </div>
+                <Switch
+                  checked={recoveryUsesDuress}
+                  onChange={() => {
+                    setRecoverySame((value) => !value)
+                    setError(null)
+                  }}
+                  label="Use duress PIN for recovery"
+                />
+              </div>
+            )}
+
+            {!recoveryUsesDuress && (
+              <label className="mt-4 block">
+                <span className="text-[0.68rem] font-medium text-muted">
+                  Separate recovery PIN
+                </span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={4}
+                  value={recoveryPin}
+                  onChange={(event) => {
+                    setRecoveryPin(event.target.value.replace(/\D/g, '').slice(0, 4))
+                    setError(null)
+                  }}
+                  className="mt-2 w-full rounded-2xl border border-line bg-lumen px-4 py-3 font-mono text-lg tracking-[0.35em] outline-none transition-colors focus:border-fathom"
+                />
+              </label>
+            )}
+          </div>
+
+          {error && (
+            <p className="mt-3 text-xs font-medium text-danger" role="alert">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[0.65rem] text-muted">
+              {displayedRecovery
+                ? `Demo recovery PIN: ${displayedRecovery}`
+                : 'Not saved yet'}
+            </p>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="btn-primary px-5 py-2.5 text-xs disabled:opacity-50"
+            >
+              {saved ? (
+                <>
+                  <Check className="size-3.5" />
+                  Silent failure updated
+                </>
+              ) : saving ? (
+                'Checking device access…'
+              ) : (
+                'Save silent failure'
+              )}
+            </button>
+          </div>
+
+          <p className="mt-4 border-t border-line pt-3 text-[0.64rem] leading-relaxed text-muted">
+            Once triggered, the app keeps transfers blocked across reloads. It never sends
+            the transfer. Use the recovery PIN to clear it.
+          </p>
+        </>
+      )}
+    </section>
+  )
+}
+
 export function Settings() {
   const state = useBankingStore()
   const resetDemo = useBankingStore((state) => state.resetDemo)
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
 
   const copyAccount = async () => {
     try {
@@ -475,10 +835,38 @@ export function Settings() {
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
         {state.duressActive
           ? 'Manage your profile and account details.'
-          : 'Manage your profile, account details, transfer PIN, and duress access.'}
+          : state.silentFailureActive
+            ? 'Manage your profile, account details, and connection status.'
+            : 'Manage your profile, account details, security, and connection safety.'}
       </p>
 
       <div className="mt-7 space-y-4">
+        {state.silentFailureActive && (
+          <section className="rounded-3xl border border-flare/35 bg-pulse-soft/45 p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-lumen text-danger">
+                <WifiOff className="size-4.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-display text-2xl font-semibold">
+                  Transfers are unavailable
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  This device cannot reach the bank network. Your balance is safe and no
+                  transfer has left your account.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setRecoveryOpen(true)}
+                  className="btn-primary mt-4 px-5 py-2.5 text-xs"
+                >
+                  Restore connection
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-line bg-lumen-deep/45 p-5">
           <div className="flex items-center gap-3">
             <span className="flex size-12 items-center justify-center rounded-full bg-dawn font-display text-xl font-semibold text-fathom-deep">
@@ -533,10 +921,11 @@ export function Settings() {
           </div>
         </section>
 
-        {!state.duressActive && (
+        {!state.duressActive && !state.silentFailureActive && (
           <>
             <PinForm />
             <DuressForm />
+            <SilentFailureForm />
 
             <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
               <div className="flex items-start gap-3">
@@ -546,8 +935,8 @@ export function Settings() {
                 <div>
                   <h2 className="font-display text-2xl font-semibold">Reset demo</h2>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
-                    Restore the starting balance, recipients, transactions, PINs, and duress
-                    settings. This clears browser-stored demo data.
+                    Restore the starting balance, recipients, transactions, PINs, duress
+                    access, and silent-failure settings. This clears browser-stored demo data.
                   </p>
                 </div>
               </div>
@@ -588,6 +977,10 @@ export function Settings() {
           browser and are not connected to a real bank.
         </div>
       </div>
+
+      {recoveryOpen && (
+        <RecoveryDialog onClose={() => setRecoveryOpen(false)} />
+      )}
     </div>
   )
 }

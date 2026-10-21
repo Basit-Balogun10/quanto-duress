@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { Activity } from '@/pages/Activity'
 import { Dashboard } from '@/pages/Dashboard'
+import { Transfer } from '@/pages/Transfer'
 
 function App() {
   return (
@@ -10,6 +11,7 @@ function App() {
       <Route path="/app" element={<AppShell />}>
         <Route index element={<Dashboard />} />
         <Route path="activity" element={<Activity />} />
+        <Route path="transfer" element={<Transfer />} />
       </Route>
       <Route path="*" element={<Navigate to="/app" replace />} />
     </Routes>

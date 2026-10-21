@@ -38,3 +38,25 @@ export function initialsOf(name: string) {
     .map((part) => part[0]?.toUpperCase())
     .join('')
 }
+
+export function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
+export function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+export function maskAccountNumber(value: string) {
+  return `•••• ${value.slice(-4)}`
+}

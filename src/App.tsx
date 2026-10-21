@@ -1,12 +1,16 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppShell } from '@/components/AppShell'
+import { Dashboard } from '@/pages/Dashboard'
+
 function App() {
   return (
-    <div className="grid min-h-screen place-items-center bg-lumen px-6">
-      <div className="text-center">
-        <p className="label-mono text-[0.6rem] text-fathom">Quanto</p>
-        <h1 className="display mt-4 text-6xl">Everyday banking.</h1>
-        <p className="mt-4 text-sm text-muted">Core banking workspace is being set up.</p>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/" element={<Navigate to="/app" replace />} />
+      <Route path="/app" element={<AppShell />}>
+        <Route index element={<Dashboard />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/app" replace />} />
+    </Routes>
   )
 }
 

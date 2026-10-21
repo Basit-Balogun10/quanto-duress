@@ -42,7 +42,7 @@ export function AppShell() {
         <div className="mt-auto rounded-3xl border border-line bg-lumen p-4">
           <p className="label-mono text-[0.56rem] text-fathom">Demo banking</p>
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            Accounts, cards, and transfers are simulated locally in this build.
+            Accounts and transfers are simulated locally in this build.
           </p>
         </div>
       </aside>

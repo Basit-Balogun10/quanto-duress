@@ -7,7 +7,7 @@ import {
   X,
 } from 'lucide-react'
 import { TransactionRow } from '@/components/TransactionRow'
-import { useBankingStore } from '@/lib/store'
+import { selectVisibleTransactions, useBankingStore } from '@/lib/store'
 import type { Transaction } from '@/lib/types'
 import { cn, formatDateTime, formatNaira } from '@/lib/utils'
 
@@ -116,7 +116,7 @@ function TransactionDetail({
 }
 
 export function Activity() {
-  const transactions = useBankingStore((state) => state.transactions)
+  const transactions = useBankingStore(selectVisibleTransactions)
   const [filter, setFilter] = useState<Filter>('all')
   const [selected, setSelected] = useState<Transaction | null>(null)
 

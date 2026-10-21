@@ -46,11 +46,23 @@ export interface Owner {
 }
 
 export type DuressBalanceMode = 'amount' | 'percent'
+export type DuressHistoryMode = 'decoy' | 'real'
 
 export interface DuressSettings {
   pin: string
   mode: DuressBalanceMode
   value: number
+  historyMode: DuressHistoryMode
+}
+
+export type SilentFailureTrigger = 'shake' | 'voice' | 'duress-pin'
+
+export interface SilentFailureSettings {
+  shake: boolean
+  voice: boolean
+  phrase: string
+  recoveryPin: string
+  recoveryUsesDuressPin: boolean
 }
 
 export interface BankingState {
@@ -63,6 +75,11 @@ export interface BankingState {
   duress: DuressSettings | null
   duressActive: boolean
   duressBalance: number
+  duressTransactions: Transaction[]
+  silentFailure: SilentFailureSettings | null
+  silentFailureActive: boolean
+  silentFailureTrigger: SilentFailureTrigger | null
+  silentFailureAt: string | null
 }
 
 export type UnlockResult = 'normal' | 'duress' | null

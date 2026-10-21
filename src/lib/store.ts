@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { createDuressLedger } from './duressLedger'
 import {
   beneficiaries as seedBeneficiaries,
   owner as seedOwner,
@@ -9,14 +10,20 @@ import type {
   BankingState,
   Beneficiary,
   DuressSettings,
+  SilentFailureSettings,
+  SilentFailureTrigger,
   Transaction,
   UnlockResult,
 } from './types'
 
 interface BankingStore extends BankingState {
   commitTransfer: (transaction: Transaction, beneficiary?: Beneficiary) => void
+  recordFailedTransfer: (transaction: Transaction) => void
   setPin: (pin: string) => void
   setDuressSettings: (settings: DuressSettings | null) => void
+  setSilentFailureSettings: (settings: SilentFailureSettings | null) => void
+  triggerSilentFailure: (trigger: SilentFailureTrigger) => void
+  clearSilentFailure: (pin: string) => boolean
   unlockWithPin: (pin: string) => UnlockResult
   resetDemo: () => void
 }
@@ -32,6 +39,11 @@ function createInitialState(): BankingState {
     duress: null,
     duressActive: false,
     duressBalance: 0,
+    duressTransactions: [],
+    silentFailure: null,
+    silentFailureActive: false,
+    silentFailureTrigger: null,
+    silentFailureAt: null,
   }
 }
 
@@ -57,6 +69,8 @@ export const useBankingStore = create<BankingStore>()(
                   item.bank === beneficiary.bank,
               )
             : true
+          const showingDecoyHistory =
+            state.duressActive && state.duress?.historyMode === 'decoy'
 
           return {
             balance: state.balance - transaction.amount,
@@ -64,10 +78,26 @@ export const useBankingStore = create<BankingStore>()(
               ? Math.max(0, state.duressBalance - transaction.amount)
               : state.duressBalance,
             transactions: [transaction, ...state.transactions],
+            duressTransactions: showingDecoyHistory
+              ? [transaction, ...state.duressTransactions]
+              : state.duressTransactions,
             beneficiaries:
               beneficiary && !exists
                 ? [beneficiary, ...state.beneficiaries]
                 : state.beneficiaries,
+          }
+        }),
+
+      recordFailedTransfer: (transaction) =>
+        set((state) => {
+          const showingDecoyHistory =
+            state.duressActive && state.duress?.historyMode === 'decoy'
+
+          return {
+            transactions: [transaction, ...state.transactions],
+            duressTransactions: showingDecoyHistory
+              ? [transaction, ...state.duressTransactions]
+              : state.duressTransactions,
           }
         }),
 
@@ -81,24 +111,66 @@ export const useBankingStore = create<BankingStore>()(
                 duress: settings,
                 duressActive: false,
                 duressBalance: 0,
+                duressTransactions: [],
               },
         ),
+
+      setSilentFailureSettings: (settings) =>
+        set({
+          silentFailure: settings,
+          silentFailureActive: false,
+          silentFailureTrigger: null,
+          silentFailureAt: null,
+        }),
+
+      triggerSilentFailure: (trigger) =>
+        set((state) => {
+          if (!state.silentFailure || state.silentFailureActive) return state
+          return {
+            silentFailureActive: true,
+            silentFailureTrigger: trigger,
+            silentFailureAt: new Date().toISOString(),
+          }
+        }),
+
+      clearSilentFailure: (pin) => {
+        const state = get()
+        const recoveryPin = selectRecoveryPin(state)
+        if (!state.silentFailureActive || !recoveryPin || pin !== recoveryPin) {
+          return false
+        }
+        set({
+          silentFailureActive: false,
+          silentFailureTrigger: null,
+          silentFailureAt: null,
+        })
+        return true
+      },
 
       unlockWithPin: (pin) => {
         const state = get()
 
         if (pin === state.pin) {
           if (state.duressActive) {
-            set({ duressActive: false, duressBalance: 0 })
+            set({
+              duressActive: false,
+              duressBalance: 0,
+              duressTransactions: [],
+            })
           }
           return 'normal'
         }
 
         if (state.duress && pin === state.duress.pin && pin !== state.pin) {
           if (!state.duressActive) {
+            const duressBalance = duressBalanceFor(state.balance, state.duress)
             set({
               duressActive: true,
-              duressBalance: duressBalanceFor(state.balance, state.duress),
+              duressBalance,
+              duressTransactions:
+                state.duress.historyMode === 'decoy'
+                  ? createDuressLedger(duressBalance, state.monthlyBudget)
+                  : [],
             })
           }
           return 'duress'
@@ -111,19 +183,30 @@ export const useBankingStore = create<BankingStore>()(
     }),
     {
       name: 'quanto-banking-demo-v1',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<BankingState>
-        if (version < 2) {
-          return {
-            ...state,
-            duress: null,
-            duressActive: false,
-            duressBalance: 0,
-          }
-        }
-        return state as BankingState
+        const deactivateDuress = version < 3
+        const duress =
+          version < 2 || !state.duress
+            ? null
+            : {
+                ...state.duress,
+                historyMode: state.duress.historyMode ?? 'decoy',
+              }
+
+        return {
+          ...state,
+          duress,
+          duressActive: deactivateDuress ? false : (state.duressActive ?? false),
+          duressBalance: deactivateDuress ? 0 : (state.duressBalance ?? 0),
+          duressTransactions: [],
+          silentFailure: state.silentFailure ?? null,
+          silentFailureActive: state.silentFailureActive ?? false,
+          silentFailureTrigger: state.silentFailureTrigger ?? null,
+          silentFailureAt: state.silentFailureAt ?? null,
+        } as BankingState
       },
     },
   ),
@@ -135,12 +218,30 @@ function inCurrentMonth(value: string) {
   return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
 }
 
+export function selectRecoveryPin(
+  state: Pick<BankingState, 'duress' | 'silentFailure'>,
+) {
+  if (!state.silentFailure) return null
+  if (state.silentFailure.recoveryUsesDuressPin && state.duress) {
+    return state.duress.pin
+  }
+  return /^\d{4}$/.test(state.silentFailure.recoveryPin)
+    ? state.silentFailure.recoveryPin
+    : null
+}
+
 export function selectAvailableBalance(state: BankingState) {
   return state.duressActive ? state.duressBalance : state.balance
 }
 
+export function selectVisibleTransactions(state: BankingState) {
+  return state.duressActive && state.duress?.historyMode === 'decoy'
+    ? state.duressTransactions
+    : state.transactions
+}
+
 export function selectMonthlySpending(state: BankingState) {
-  return state.transactions
+  return selectVisibleTransactions(state)
     .filter(
       (transaction) =>
         transaction.direction === 'out' &&
@@ -151,7 +252,7 @@ export function selectMonthlySpending(state: BankingState) {
 }
 
 export function selectMonthlyIncome(state: BankingState) {
-  return state.transactions
+  return selectVisibleTransactions(state)
     .filter(
       (transaction) =>
         transaction.direction === 'in' &&

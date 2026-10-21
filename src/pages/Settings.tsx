@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useBankingStore } from '@/lib/store'
-import type { DuressBalanceMode } from '@/lib/types'
+import type { DuressBalanceMode, DuressHistoryMode } from '@/lib/types'
 import { cn, formatNaira } from '@/lib/utils'
 
 function PinForm() {
@@ -129,6 +129,9 @@ function DuressForm() {
   const [setupOpen, setSetupOpen] = useState(configured)
   const [duressPin, setDuressPin] = useState(duress?.pin ?? '')
   const [mode, setMode] = useState<DuressBalanceMode>(duress?.mode ?? 'percent')
+  const [historyMode, setHistoryMode] = useState<DuressHistoryMode>(
+    duress?.historyMode ?? 'decoy',
+  )
   const [amount, setAmount] = useState(
     duress?.mode === 'amount' ? String(duress.value) : '',
   )
@@ -151,6 +154,7 @@ function DuressForm() {
       if (configured) setDuressSettings(null)
       setDuressPin('')
       setMode('percent')
+      setHistoryMode('decoy')
       setAmount('')
       setPercent('20')
       setError(null)
@@ -183,6 +187,7 @@ function DuressForm() {
       pin: duressPin,
       mode,
       value: Math.round(mode === 'amount' ? amountValue : percentValue),
+      historyMode,
     })
     setError(null)
     setSaved(true)
@@ -336,6 +341,57 @@ function DuressForm() {
               )}
             </div>
           </label>
+
+          <div className="mt-4">
+            <span className="text-[0.68rem] font-medium text-muted">
+              History in duress mode
+            </span>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setHistoryMode('decoy')
+                  setError(null)
+                }}
+                className={cn(
+                  'rounded-2xl border p-3.5 text-left transition-colors',
+                  historyMode === 'decoy'
+                    ? 'border-fathom bg-fathom-soft/55'
+                    : 'border-line bg-lumen-deep/40 hover:border-fathom/40',
+                )}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-semibold">
+                  {historyMode === 'decoy' && <Check className="size-3.5 text-fathom" />}
+                  Match dummy balance
+                </span>
+                <span className="mt-1 block text-[0.64rem] leading-relaxed text-muted">
+                  Build a separate, realistic spending history that adds up to the balance
+                  shown.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setHistoryMode('real')
+                  setError(null)
+                }}
+                className={cn(
+                  'rounded-2xl border p-3.5 text-left transition-colors',
+                  historyMode === 'real'
+                    ? 'border-fathom bg-fathom-soft/55'
+                    : 'border-line bg-lumen-deep/40 hover:border-fathom/40',
+                )}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-semibold">
+                  {historyMode === 'real' && <Check className="size-3.5 text-fathom" />}
+                  Keep real history
+                </span>
+                <span className="mt-1 block text-[0.64rem] leading-relaxed text-muted">
+                  Keep the actual transactions visible even though the balance is reduced.
+                </span>
+              </button>
+            </div>
+          </div>
 
           <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
             <p className="label-mono text-[0.52rem] text-muted">

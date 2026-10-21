@@ -17,6 +17,7 @@ import {
   selectAvailableBalance,
   selectMonthlyIncome,
   selectMonthlySpending,
+  selectVisibleTransactions,
   useBankingStore,
 } from '@/lib/store'
 import { formatNaira } from '@/lib/utils'
@@ -42,7 +43,7 @@ export function Dashboard() {
   )
   const remainingBudget = Math.max(state.monthlyBudget - monthlySpending, 0)
   const favorites = state.beneficiaries.filter((beneficiary) => beneficiary.favorite)
-  const recent = state.transactions.slice(0, 5)
+  const recent = selectVisibleTransactions(state).slice(0, 5)
 
   const copyAccountNumber = async () => {
     try {

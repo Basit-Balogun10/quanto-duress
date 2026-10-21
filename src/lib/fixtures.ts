@@ -1,4 +1,4 @@
-import type { Beneficiary, Card, Owner, Transaction } from './types'
+import type { Beneficiary, Owner, Transaction } from './types'
 
 export const owner: Owner = {
   name: 'Ada Okafor',
@@ -6,16 +6,6 @@ export const owner: Owner = {
   accountNumber: '0123456789',
   bank: 'Quanto',
   initials: 'AO',
-}
-
-export const card: Card = {
-  id: 'card_virtual_4821',
-  label: 'Quanto Virtual',
-  holder: 'ADA OKAFOR',
-  last4: '4821',
-  expiry: '09/29',
-  frozen: false,
-  monthlyLimit: 250000,
 }
 
 export const beneficiaries: Beneficiary[] = [

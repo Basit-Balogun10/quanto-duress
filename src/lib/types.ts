@@ -37,16 +37,6 @@ export interface Beneficiary {
   favorite?: boolean
 }
 
-export interface Card {
-  id: string
-  label: string
-  holder: string
-  last4: string
-  expiry: string
-  frozen: boolean
-  monthlyLimit: number
-}
-
 export interface Owner {
   name: string
   firstName: string
@@ -60,7 +50,6 @@ export interface BankingState {
   balance: number
   pin: string
   monthlyBudget: number
-  card: Card
   beneficiaries: Beneficiary[]
   transactions: Transaction[]
 }

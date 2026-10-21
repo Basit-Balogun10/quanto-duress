@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import {
   beneficiaries as seedBeneficiaries,
-  card as seedCard,
   owner as seedOwner,
   seedTransactions,
 } from './fixtures'
@@ -10,7 +9,6 @@ import type { BankingState, Beneficiary, Transaction } from './types'
 
 interface BankingStore extends BankingState {
   commitTransfer: (transaction: Transaction, beneficiary?: Beneficiary) => void
-  toggleCardFreeze: () => void
   setPin: (pin: string) => void
   resetDemo: () => void
 }
@@ -21,7 +19,6 @@ function createInitialState(): BankingState {
     balance: 842500,
     pin: '1234',
     monthlyBudget: 300000,
-    card: { ...seedCard },
     beneficiaries: structuredClone(seedBeneficiaries),
     transactions: structuredClone(seedTransactions),
   }
@@ -51,11 +48,6 @@ export const useBankingStore = create<BankingStore>()(
                 : state.beneficiaries,
           }
         }),
-
-      toggleCardFreeze: () =>
-        set((state) => ({
-          card: { ...state.card, frozen: !state.card.frozen },
-        })),
 
       setPin: (pin) => set({ pin }),
 

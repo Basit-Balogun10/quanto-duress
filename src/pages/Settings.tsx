@@ -18,7 +18,7 @@ import { cn, formatNaira } from '@/lib/utils'
 
 function PinForm() {
   const pin = useBankingStore((state) => state.pin)
-  const duressPin = useBankingStore((state) => state.duress.pin)
+  const duressPin = useBankingStore((state) => state.duress?.pin)
   const setPin = useBankingStore((state) => state.setPin)
   const [currentPin, setCurrentPin] = useState('')
   const [nextPin, setNextPin] = useState('')
@@ -44,7 +44,7 @@ function PinForm() {
       setError('Choose a new PIN that is different from your current PIN.')
       return
     }
-    if (nextPin === duressPin) {
+    if (duressPin && nextPin === duressPin) {
       setError('Choose a PIN that is different from your duress PIN.')
       return
     }
@@ -124,16 +124,16 @@ function DuressForm() {
   const pin = useBankingStore((state) => state.pin)
   const balance = useBankingStore((state) => state.balance)
   const setDuressSettings = useBankingStore((state) => state.setDuressSettings)
+  const configured = duress !== null
 
-  const [duressPin, setDuressPin] = useState(duress.pin)
-  const [mode, setMode] = useState<DuressBalanceMode>(duress.mode)
+  const [setupOpen, setSetupOpen] = useState(configured)
+  const [duressPin, setDuressPin] = useState(duress?.pin ?? '')
+  const [mode, setMode] = useState<DuressBalanceMode>(duress?.mode ?? 'percent')
   const [amount, setAmount] = useState(
-    duress.mode === 'amount'
-      ? String(duress.value)
-      : String(Math.round((balance * duress.value) / 100)),
+    duress?.mode === 'amount' ? String(duress.value) : '',
   )
   const [percent, setPercent] = useState(
-    duress.mode === 'percent' ? String(duress.value) : '20',
+    duress?.mode === 'percent' ? String(duress.value) : '20',
   )
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -144,6 +144,21 @@ function DuressForm() {
     mode === 'amount'
       ? Math.min(amountValue, balance)
       : Math.round((balance * Math.min(percentValue, 100)) / 100)
+
+  const toggle = () => {
+    if (setupOpen) {
+      setSetupOpen(false)
+      if (configured) setDuressSettings(null)
+      setDuressPin('')
+      setMode('percent')
+      setAmount('')
+      setPercent('20')
+      setError(null)
+      setSaved(false)
+      return
+    }
+    setSetupOpen(true)
+  }
 
   const save = () => {
     setSaved(false)
@@ -183,144 +198,193 @@ function DuressForm() {
         <div>
           <h2 className="font-display text-2xl font-semibold">Duress access</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            Unlock the app with this PIN to show a limited balance instead of your real
-            balance. Transfers are capped at that amount.
+            Opt in to a second PIN that shows a limited balance and caps how much can be
+            sent. It is off until you set it up.
           </p>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-[0.68rem] font-medium text-muted">Duress PIN</span>
-          <input
-            type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={4}
-            value={duressPin}
-            onChange={(event) => {
-              setDuressPin(event.target.value.replace(/\D/g, '').slice(0, 4))
-              setError(null)
-            }}
-            className="mt-2 w-full rounded-2xl border border-line bg-lumen-deep/40 px-4 py-3 font-mono text-lg tracking-[0.35em] outline-none transition-colors focus:border-fathom"
-          />
-        </label>
-
+      <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-line bg-lumen-deep/40 px-4 py-3.5">
         <div>
-          <span className="text-[0.68rem] font-medium text-muted">Show balance as</span>
-          <div className="mt-2 flex rounded-2xl border border-line bg-lumen-deep/40 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('amount')
-                setError(null)
-              }}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[0.68rem] font-medium transition-colors',
-                mode === 'amount'
-                  ? 'bg-fathom text-lumen'
-                  : 'text-muted hover:text-vast',
-              )}
-            >
-              <Banknote className="size-3.5" />
-              Amount
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('percent')
-                setError(null)
-              }}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[0.68rem] font-medium transition-colors',
-                mode === 'percent'
-                  ? 'bg-fathom text-lumen'
-                  : 'text-muted hover:text-vast',
-              )}
-            >
-              <Percent className="size-3.5" />
-              Percentage
-            </button>
-          </div>
+          <p className="text-xs font-semibold">
+            {setupOpen
+              ? configured
+                ? 'Duress access enabled'
+                : 'Finish setting up'
+              : 'Duress access off'}
+          </p>
+          <p className="mt-0.5 text-[0.65rem] leading-relaxed text-muted">
+            {setupOpen
+              ? configured
+                ? 'Your duress PIN is active on the lock screen.'
+                : 'Save the details below to turn it on.'
+              : 'Unlocking always shows your real balance until this is turned on.'}
+          </p>
         </div>
-      </div>
-
-      <label className="mt-4 block">
-        <span className="text-[0.68rem] font-medium text-muted">
-          {mode === 'amount' ? 'Amount to show' : 'Percentage to show'}
-        </span>
-        <div className="relative mt-2">
-          {mode === 'amount' && (
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-display text-lg text-muted">
-              ₦
-            </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={setupOpen}
+          aria-label="Enable duress access"
+          onClick={toggle}
+          className={cn(
+            'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+            setupOpen ? 'bg-fathom' : 'bg-lumen-dark',
           )}
-          <input
-            value={mode === 'amount' ? amount : percent}
-            onChange={(event) => {
-              const next = event.target.value
-                .replace(/\D/g, '')
-                .slice(0, mode === 'amount' ? 9 : 3)
-              if (mode === 'amount') {
-                setAmount(next)
-              } else {
-                setPercent(next)
-              }
-              setError(null)
-            }}
-            inputMode="numeric"
-            autoComplete="off"
+        >
+          <span
             className={cn(
-              'w-full rounded-2xl border border-line bg-lumen px-4 py-3.5 font-mono text-sm outline-none transition-colors focus:border-fathom',
-              mode === 'amount' ? 'pl-9' : 'pr-10',
+              'size-5 rounded-full bg-lumen shadow-sm transition-transform',
+              setupOpen ? 'translate-x-5.5' : 'translate-x-0.5',
             )}
           />
-          {mode === 'percent' && (
-            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm text-muted">
-              %
-            </span>
-          )}
-        </div>
-      </label>
-
-      <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
-        <p className="label-mono text-[0.52rem] text-muted">Balance shown in duress mode</p>
-        <p className="mt-1.5 font-display text-3xl font-semibold tracking-[-0.04em]">
-          {formatNaira(preview)}
-        </p>
-        <p className="mt-1 text-[0.66rem] leading-relaxed text-muted">
-          {mode === 'percent'
-            ? `${Math.min(percentValue, 100)}% of your current ${formatNaira(balance)} balance.`
-            : 'A fixed amount, capped at your current available balance.'}{' '}
-          It becomes the maximum you can send while duress mode is active.
-        </p>
-      </div>
-
-      {error && (
-        <p className="mt-3 text-xs font-medium text-danger" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.65rem] text-muted">Demo duress PIN: {duress.pin}</p>
-        <button type="button" onClick={save} className="btn-primary px-5 py-2.5 text-xs">
-          {saved ? (
-            <>
-              <Check className="size-3.5" />
-              Duress access updated
-            </>
-          ) : (
-            'Save duress access'
-          )}
         </button>
       </div>
 
-      <p className="mt-4 border-t border-line pt-3 text-[0.64rem] leading-relaxed text-muted">
-        The limited balance is locked in when you unlock with the duress PIN and stays in
-        place across reloads. Unlock with your normal PIN to clear it and restore your real
-        balance.
-      </p>
+      {setupOpen && (
+        <>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-[0.68rem] font-medium text-muted">Duress PIN</span>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={4}
+                value={duressPin}
+                onChange={(event) => {
+                  setDuressPin(event.target.value.replace(/\D/g, '').slice(0, 4))
+                  setError(null)
+                }}
+                className="mt-2 w-full rounded-2xl border border-line bg-lumen-deep/40 px-4 py-3 font-mono text-lg tracking-[0.35em] outline-none transition-colors focus:border-fathom"
+              />
+            </label>
+
+            <div>
+              <span className="text-[0.68rem] font-medium text-muted">Show balance as</span>
+              <div className="mt-2 flex rounded-2xl border border-line bg-lumen-deep/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('amount')
+                    setError(null)
+                  }}
+                  className={cn(
+                    'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[0.68rem] font-medium transition-colors',
+                    mode === 'amount'
+                      ? 'bg-fathom text-lumen'
+                      : 'text-muted hover:text-vast',
+                  )}
+                >
+                  <Banknote className="size-3.5" />
+                  Amount
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('percent')
+                    setError(null)
+                  }}
+                  className={cn(
+                    'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[0.68rem] font-medium transition-colors',
+                    mode === 'percent'
+                      ? 'bg-fathom text-lumen'
+                      : 'text-muted hover:text-vast',
+                  )}
+                >
+                  <Percent className="size-3.5" />
+                  Percentage
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <label className="mt-4 block">
+            <span className="text-[0.68rem] font-medium text-muted">
+              {mode === 'amount' ? 'Amount to show' : 'Percentage to show'}
+            </span>
+            <div className="relative mt-2">
+              {mode === 'amount' && (
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-display text-lg text-muted">
+                  ₦
+                </span>
+              )}
+              <input
+                value={mode === 'amount' ? amount : percent}
+                onChange={(event) => {
+                  const next = event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, mode === 'amount' ? 9 : 3)
+                  if (mode === 'amount') {
+                    setAmount(next)
+                  } else {
+                    setPercent(next)
+                  }
+                  setError(null)
+                }}
+                inputMode="numeric"
+                autoComplete="off"
+                className={cn(
+                  'w-full rounded-2xl border border-line bg-lumen px-4 py-3.5 font-mono text-sm outline-none transition-colors focus:border-fathom',
+                  mode === 'amount' ? 'pl-9' : 'pr-10',
+                )}
+              />
+              {mode === 'percent' && (
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm text-muted">
+                  %
+                </span>
+              )}
+            </div>
+          </label>
+
+          <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
+            <p className="label-mono text-[0.52rem] text-muted">
+              Balance shown in duress mode
+            </p>
+            <p className="mt-1.5 font-display text-3xl font-semibold tracking-[-0.04em]">
+              {formatNaira(preview)}
+            </p>
+            <p className="mt-1 text-[0.66rem] leading-relaxed text-muted">
+              {mode === 'percent'
+                ? `${Math.min(percentValue, 100)}% of your current ${formatNaira(balance)} balance.`
+                : 'A fixed amount, capped at your current available balance.'}{' '}
+              It becomes the maximum you can send while duress mode is active.
+            </p>
+          </div>
+
+          {error && (
+            <p className="mt-3 text-xs font-medium text-danger" role="alert">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[0.65rem] text-muted">
+              {duress ? `Demo duress PIN: ${duress.pin}` : 'Not saved yet'}
+            </p>
+            <button
+              type="button"
+              onClick={save}
+              className="btn-primary px-5 py-2.5 text-xs"
+            >
+              {saved ? (
+                <>
+                  <Check className="size-3.5" />
+                  Duress access updated
+                </>
+              ) : (
+                'Save duress access'
+              )}
+            </button>
+          </div>
+
+          <p className="mt-4 border-t border-line pt-3 text-[0.64rem] leading-relaxed text-muted">
+            The limited balance is locked in when you unlock with the duress PIN and stays
+            in place across reloads. Unlock with your normal PIN to clear it and restore
+            your real balance.
+          </p>
+        </>
+      )}
     </section>
   )
 }

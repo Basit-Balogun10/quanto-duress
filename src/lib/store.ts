@@ -16,7 +16,7 @@ import type {
 interface BankingStore extends BankingState {
   commitTransfer: (transaction: Transaction, beneficiary?: Beneficiary) => void
   setPin: (pin: string) => void
-  setDuressSettings: (settings: DuressSettings) => void
+  setDuressSettings: (settings: DuressSettings | null) => void
   unlockWithPin: (pin: string) => UnlockResult
   resetDemo: () => void
 }
@@ -29,11 +29,7 @@ function createInitialState(): BankingState {
     monthlyBudget: 300000,
     beneficiaries: structuredClone(seedBeneficiaries),
     transactions: structuredClone(seedTransactions),
-    duress: {
-      pin: '9111',
-      mode: 'percent',
-      value: 20,
-    },
+    duress: null,
     duressActive: false,
     duressBalance: 0,
   }
@@ -78,7 +74,15 @@ export const useBankingStore = create<BankingStore>()(
       setPin: (pin) => set({ pin }),
 
       setDuressSettings: (settings) =>
-        set((state) => (state.duressActive ? state : { duress: settings })),
+        set((state) =>
+          state.duressActive
+            ? state
+            : {
+                duress: settings,
+                duressActive: false,
+                duressBalance: 0,
+              },
+        ),
 
       unlockWithPin: (pin) => {
         const state = get()
@@ -90,7 +94,7 @@ export const useBankingStore = create<BankingStore>()(
           return 'normal'
         }
 
-        if (pin === state.duress.pin && pin !== state.pin) {
+        if (state.duress && pin === state.duress.pin && pin !== state.pin) {
           if (!state.duressActive) {
             set({
               duressActive: true,
@@ -107,8 +111,20 @@ export const useBankingStore = create<BankingStore>()(
     }),
     {
       name: 'quanto-banking-demo-v1',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persistedState, version) => {
+        const state = persistedState as Partial<BankingState>
+        if (version < 2) {
+          return {
+            ...state,
+            duress: null,
+            duressActive: false,
+            duressBalance: 0,
+          }
+        }
+        return state as BankingState
+      },
     },
   ),
 )

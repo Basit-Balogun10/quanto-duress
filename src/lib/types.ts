@@ -60,7 +60,7 @@ export interface BankingState {
   monthlyBudget: number
   beneficiaries: Beneficiary[]
   transactions: Transaction[]
-  duress: DuressSettings
+  duress: DuressSettings | null
   duressActive: boolean
   duressBalance: number
 }

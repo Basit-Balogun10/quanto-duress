@@ -19,7 +19,8 @@ export async function submitTransfer(input: TransferInput): Promise<TransferResu
   const state = useBankingStore.getState()
 
   const normalPin = input.pin === state.pin
-  const duressPin = state.duressActive && input.pin === state.duress.pin
+  const duressPin =
+    state.duressActive && Boolean(state.duress) && input.pin === state.duress?.pin
 
   if (!normalPin && !duressPin) {
     throw new TransferError('That PIN is not correct. Try again.')

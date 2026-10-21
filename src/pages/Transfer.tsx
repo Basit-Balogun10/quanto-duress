@@ -581,7 +581,7 @@ export function Transfer() {
             )}
 
             <p className="mt-5 border-t border-line pt-3 text-center font-mono text-[0.56rem] uppercase tracking-wider text-muted/60">
-              Demo PIN: 1234
+              Demo PIN: {state.pin}
             </p>
           </div>
         </div>

@@ -525,6 +525,7 @@ function SilentFailureForm() {
       reset()
       return
     }
+    if (!configured) setRecoverySame(Boolean(duress))
     setSetupOpen(true)
   }
 

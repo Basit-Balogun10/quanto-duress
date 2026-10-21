@@ -9,16 +9,25 @@ import {
   LockKeyhole,
   Search,
   UserPlus,
+  WifiOff,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PinInput } from '@/components/PinInput'
+import { RecoveryDialog } from '@/components/RecoveryDialog'
 import { TransferReceipt } from '@/components/TransferReceipt'
-import { submitTransfer, TransferError } from '@/lib/api'
+import { NetworkError, submitTransfer, TransferError } from '@/lib/api'
 import { selectAvailableBalance, useBankingStore } from '@/lib/store'
 import type { Beneficiary, Transaction } from '@/lib/types'
 import { cn, formatNaira, initialsOf } from '@/lib/utils'
 
-type Step = 'recipient' | 'amount' | 'review' | 'pin' | 'processing' | 'success'
+type Step =
+  | 'recipient'
+  | 'amount'
+  | 'review'
+  | 'pin'
+  | 'processing'
+  | 'success'
+  | 'failed'
 
 const banks = [
   'Access Bank',
@@ -57,6 +66,8 @@ export function Transfer() {
   const [pinError, setPinError] = useState<string | null>(null)
   const [pinResetKey, setPinResetKey] = useState(0)
   const [receipt, setReceipt] = useState<Transaction | null>(null)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [restored, setRestored] = useState(false)
 
   const [newName, setNewName] = useState('')
   const [newBank, setNewBank] = useState(banks[0])
@@ -123,6 +134,10 @@ export function Transfer() {
     if (step === 'review') {
       setStep('amount')
     }
+    if (step === 'failed') {
+      setRestored(false)
+      setStep('review')
+    }
   }
 
   const handlePin = async (pin: string) => {
@@ -139,12 +154,17 @@ export function Transfer() {
       setReceipt(result.transaction)
       setStep('success')
     } catch (error) {
+      setPinResetKey((key) => key + 1)
+      if (error instanceof NetworkError) {
+        setPinError(null)
+        setStep('failed')
+        return
+      }
       setPinError(
         error instanceof TransferError
           ? error.message
           : 'Something went wrong. Please try again.',
       )
-      setPinResetKey((key) => key + 1)
       setStep('pin')
     }
   }
@@ -538,6 +558,72 @@ export function Transfer() {
             </div>
           </div>
         )}
+
+        {step === 'failed' && selected && (
+          <div className="py-2 text-center">
+            <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-pulse-soft text-danger">
+              <WifiOff className="size-6" />
+            </span>
+            <p className="label-mono mt-5 text-[0.56rem] text-danger">Transfer failed</p>
+            <h2 className="mx-auto mt-2 max-w-sm font-display text-3xl font-semibold tracking-[-0.035em]">
+              We couldn&apos;t reach the network.
+            </h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted">
+              No money has left your account. Check your connection and try again.
+            </p>
+
+            <div className="mx-auto mt-5 max-w-sm rounded-2xl border border-line bg-lumen-deep/40 p-4 text-left">
+              <div className="flex items-center justify-between gap-4 text-xs">
+                <span className="text-muted">Attempted transfer</span>
+                <span className="font-mono font-semibold">{formatNaira(numericAmount)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-4 text-xs">
+                <span className="text-muted">Recipient</span>
+                <span className="max-w-[60%] truncate font-medium">{selected.name}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-4 text-xs">
+                <span className="text-muted">Status</span>
+                <span className="rounded-full bg-pulse-soft px-2.5 py-1 text-[0.6rem] font-semibold text-danger">
+                  Failed
+                </span>
+              </div>
+            </div>
+
+            {restored && (
+              <p className="mx-auto mt-4 max-w-sm rounded-2xl bg-success-soft px-4 py-3 text-xs font-medium text-success">
+                Connection restored. You can try this transfer again.
+              </p>
+            )}
+
+            <div className="mx-auto mt-5 flex max-w-sm flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRestored(false)
+                  setStep('review')
+                }}
+                className="btn-primary w-full py-3.5 text-sm"
+              >
+                Try again
+                <ArrowRight className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecoveryOpen(true)}
+                className="btn-secondary w-full py-3.5 text-sm"
+              >
+                Restore connection
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/app')}
+                className="py-2 text-xs font-medium text-muted transition-colors hover:text-vast"
+              >
+                Back home
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {(step === 'pin' || step === 'processing') && selected && (
@@ -590,6 +676,13 @@ export function Transfer() {
             )}
           </div>
         </div>
+      )}
+
+      {recoveryOpen && (
+        <RecoveryDialog
+          onClose={() => setRecoveryOpen(false)}
+          onRestored={() => setRestored(true)}
+        />
       )}
 
       {step === 'success' && receipt && (

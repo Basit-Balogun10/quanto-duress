@@ -88,7 +88,3 @@ export function selectMonthlyIncome(state: BankingState) {
     )
     .reduce((total, transaction) => total + transaction.amount, 0)
 }
-
-export function selectAvailableBalance(state: BankingState) {
-  return state.balance
-}

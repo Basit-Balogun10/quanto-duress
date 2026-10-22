@@ -1,0 +1,17 @@
+name = "quanto-duress-decoy"
+main = "worker/src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "quanto-decoy"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "worker/migrations"
+
+[vars]
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"

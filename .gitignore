@@ -28,3 +28,8 @@ playwright/.cache
 *.njsproj
 *.sln
 *.sw?
+
+# Cloudflare Worker
+.wrangler
+.dev.vars
+worker/dist

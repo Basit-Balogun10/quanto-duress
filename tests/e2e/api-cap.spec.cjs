@@ -13,8 +13,6 @@ async function enterPin(page, pin) {
 test('transfer API enforces duress caps and PINs', async ({ browser }) => {
   const page = await browser.newPage();
   await page.goto(BASE + '/');
-  await page.evaluate(() => localStorage.clear());
-  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await enterPin(page, '1234');
   await page.getByRole('heading', { name: 'Ada' }).waitFor();
   await page.goto(BASE + '/app/settings');

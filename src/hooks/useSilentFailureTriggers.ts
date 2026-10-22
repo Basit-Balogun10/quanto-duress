@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   getSpeechRecognition,
   motionMagnitude,
@@ -6,11 +6,27 @@ import {
 } from '@/lib/triggers'
 import { useBankingStore } from '@/lib/store'
 
+function usePageVisible() {
+  const [visible, setVisible] = useState(() => document.visibilityState === 'visible')
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setVisible(document.visibilityState === 'visible')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  return visible
+}
+
 export function useSilentFailureTriggers() {
   const settings = useBankingStore((state) => state.silentFailure)
   const active = useBankingStore((state) => state.silentFailureActive)
   const trigger = useBankingStore((state) => state.triggerSilentFailure)
-  const listening = Boolean(settings) && !active
+  const visible = usePageVisible()
+  const listening = Boolean(settings) && !active && visible
 
   useEffect(() => {
     if (!listening || !settings?.shake) return

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { LockScreen } from '@/components/LockScreen'
+import { useSilentFailureTriggers } from '@/hooks/useSilentFailureTriggers'
 import { Activity } from '@/pages/Activity'
 import { Dashboard } from '@/pages/Dashboard'
 import { Settings } from '@/pages/Settings'
@@ -9,6 +10,7 @@ import { Transfer } from '@/pages/Transfer'
 
 function App() {
   const [locked, setLocked] = useState(true)
+  useSilentFailureTriggers()
 
   if (locked) {
     return <LockScreen onUnlock={() => setLocked(false)} />

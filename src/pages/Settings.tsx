@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Banknote,
   Check,
@@ -17,7 +17,16 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { RecoveryDialog } from '@/components/RecoveryDialog'
 import { useBankingStore } from '@/lib/store'
-import { motionSupported, requestMotionAccess, speechSupported } from '@/lib/triggers'
+import {
+  getRememberedMicrophoneAccess,
+  getRememberedMotionAccess,
+  motionSupported,
+  queryMicrophoneAccess,
+  requestMicrophoneAccess,
+  requestMotionAccess,
+  speechSupported,
+} from '@/lib/triggers'
+import type { TriggerAccess } from '@/lib/triggers'
 import type { DuressBalanceMode, DuressHistoryMode } from '@/lib/types'
 import { cn, formatNaira } from '@/lib/utils'
 
@@ -484,6 +493,31 @@ function DuressForm() {
   )
 }
 
+const accessStyles: Record<TriggerAccess, { label: string; className: string }> = {
+  granted: { label: 'Granted', className: 'bg-success-soft text-success' },
+  denied: { label: 'Denied', className: 'bg-danger-soft text-danger' },
+  unsupported: { label: 'Unsupported', className: 'bg-lumen-dark text-muted' },
+  unknown: { label: 'Not requested', className: 'bg-warning-soft text-warning' },
+}
+
+function AccessStatus({ label, status }: { label: string; status: TriggerAccess }) {
+  const style = accessStyles[status]
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-lumen px-3 py-2.5">
+      <span className="text-[0.66rem] font-medium text-muted">{label}</span>
+      <span
+        className={cn(
+          'rounded-full px-2 py-1 text-[0.56rem] font-semibold',
+          style.className,
+        )}
+      >
+        {style.label}
+      </span>
+    </div>
+  )
+}
+
 function SilentFailureForm() {
   const silentFailure = useBankingStore((state) => state.silentFailure)
   const duress = useBankingStore((state) => state.duress)
@@ -496,8 +530,18 @@ function SilentFailureForm() {
   const voiceAvailable = speechSupported()
 
   const [setupOpen, setSetupOpen] = useState(configured)
-  const [shake, setShake] = useState(silentFailure?.shake ?? true)
-  const [voice, setVoice] = useState(silentFailure?.voice ?? false)
+  const [shake, setShake] = useState(
+    () => (silentFailure?.shake ?? true) && motionAvailable,
+  )
+  const [voice, setVoice] = useState(
+    () => (silentFailure?.voice ?? false) && voiceAvailable,
+  )
+  const [motionAccess, setMotionAccess] = useState<TriggerAccess>(() =>
+    motionAvailable ? getRememberedMotionAccess() : 'unsupported',
+  )
+  const [micAccess, setMicAccess] = useState<TriggerAccess>(() =>
+    voiceAvailable ? getRememberedMicrophoneAccess() : 'unsupported',
+  )
   const [phrase, setPhrase] = useState(silentFailure?.phrase ?? 'quanto hold')
   const [recoverySame, setRecoverySame] = useState(
     silentFailure ? silentFailure.recoveryUsesDuressPin : Boolean(duress),
@@ -508,12 +552,29 @@ function SilentFailureForm() {
   const [saving, setSaving] = useState(false)
   const recoveryUsesDuress = recoverySame && Boolean(duress)
 
+  useEffect(() => {
+    if (!voiceAvailable) return
+
+    let cancelled = false
+    void queryMicrophoneAccess().then((access) => {
+      if (!cancelled && access !== 'unknown') setMicAccess(access)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [voiceAvailable])
+
   const reset = () => {
-    setShake(true)
+    setShake(motionAvailable)
     setVoice(false)
     setPhrase('quanto hold')
     setRecoverySame(Boolean(duress))
     setRecoveryPin('')
+    setMotionAccess(motionAvailable ? getRememberedMotionAccess() : 'unsupported')
+    setMicAccess(
+      voiceAvailable ? getRememberedMicrophoneAccess() : 'unsupported',
+    )
     setError(null)
     setSaved(false)
   }
@@ -559,19 +620,41 @@ function SilentFailureForm() {
       return
     }
 
-    if (shake) {
-      setSaving(true)
+    if (usableShake || usableVoice) setSaving(true)
+
+    if (usableShake) {
       const access = await requestMotionAccess()
-      setSaving(false)
-      if (access === 'denied') {
-        setError('Motion access was denied. Allow it in your browser settings.')
+      setMotionAccess(access)
+      if (access !== 'granted') {
+        setSaving(false)
+        setError(
+          access === 'denied'
+            ? 'Motion access was denied. Allow it in your browser settings.'
+            : 'Motion access is unavailable on this device.',
+        )
         return
       }
     }
 
+    if (usableVoice) {
+      const access = await requestMicrophoneAccess()
+      setMicAccess(access)
+      if (access !== 'granted') {
+        setSaving(false)
+        setError(
+          access === 'denied'
+            ? 'Microphone access was denied. Allow it in your browser settings.'
+            : 'Microphone access is unavailable on this device.',
+        )
+        return
+      }
+    }
+
+    setSaving(false)
+
     setSilentFailureSettings({
-      shake,
-      voice,
+      shake: usableShake,
+      voice: usableVoice,
       phrase: phrase.trim(),
       recoveryPin: recovery,
       recoveryUsesDuressPin: recoveryUsesDuress,
@@ -609,7 +692,7 @@ function SilentFailureForm() {
           <p className="mt-0.5 text-[0.65rem] leading-relaxed text-muted">
             {setupOpen
               ? configured
-                ? 'Triggers are listening while the app is open.'
+                ? 'Triggers are armed only while this tab is in the foreground.'
                 : 'Choose triggers and a recovery PIN below.'
               : 'Transfers always behave normally until this is turned on.'}
           </p>
@@ -633,7 +716,7 @@ function SilentFailureForm() {
                   <p className="text-xs font-semibold">Shake to fail</p>
                   <p className="mt-0.5 text-[0.64rem] leading-relaxed text-muted">
                     {motionAvailable
-                      ? 'Three sharp shakes within a second trigger the failure.'
+                      ? 'Three sharp shakes within a second trigger the failure. Motion access is requested on save.'
                       : 'Motion sensors are unavailable on this device.'}
                   </p>
                 </div>
@@ -644,6 +727,7 @@ function SilentFailureForm() {
                   setShake((value) => !value)
                   setError(null)
                 }}
+                disabled={!motionAvailable}
                 label="Toggle shake trigger"
               />
             </div>
@@ -657,7 +741,7 @@ function SilentFailureForm() {
                   <p className="text-xs font-semibold">Wake phrase</p>
                   <p className="mt-0.5 text-[0.64rem] leading-relaxed text-muted">
                     {voiceAvailable
-                      ? 'Listens while the app is open. Microphone permission may be requested.'
+                      ? 'Listens only in the foreground. Microphone access is requested on save.'
                       : 'Voice recognition is unavailable in this browser.'}
                   </p>
                 </div>
@@ -668,6 +752,7 @@ function SilentFailureForm() {
                   setVoice((value) => !value)
                   setError(null)
                 }}
+                disabled={!voiceAvailable}
                 label="Toggle wake phrase trigger"
               />
             </div>
@@ -697,6 +782,41 @@ function SilentFailureForm() {
                 {duress ? 'On' : 'Unavailable'}
               </span>
             </div>
+
+            <div className="flex items-center justify-between gap-4 border-t border-line bg-lumen-deep/30 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                  <Landmark className="size-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold">Hold the logo</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-relaxed text-muted">
+                    Press and hold the Quanto logo for 2.5 seconds anywhere, including the
+                    lock screen.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-success-soft px-3 py-1.5 text-[0.6rem] font-medium text-success">
+                On
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="label-mono text-[0.52rem] text-muted">Device access</p>
+              <span className="rounded-full bg-fathom-soft px-2.5 py-1 text-[0.56rem] font-semibold text-fathom">
+                Foreground only
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <AccessStatus label="Motion" status={motionAccess} />
+              <AccessStatus label="Microphone" status={micAccess} />
+            </div>
+            <p className="mt-2 text-[0.62rem] leading-relaxed text-muted">
+              Permissions are requested when you save. Shake and wake-phrase listening pause
+              whenever this tab is in the background.
+            </p>
           </div>
 
           {voice && (

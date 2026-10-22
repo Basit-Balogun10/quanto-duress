@@ -1,7 +1,6 @@
 import { House, LockKeyhole, ReceiptText, Settings2 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from './Logo'
-import { useSilentFailureTriggers } from '@/hooks/useSilentFailureTriggers'
 import { useBankingStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +16,6 @@ interface AppShellProps {
 
 export function AppShell({ onLock }: AppShellProps) {
   const owner = useBankingStore((state) => state.owner)
-  useSilentFailureTriggers()
 
   return (
     <div className="min-h-screen bg-lumen text-vast">

@@ -47,6 +47,9 @@ function createInitialState(): BankingState {
   }
 }
 
+const TRIGGER_COOLDOWN_MS = 1500
+let lastTriggerAttempt = 0
+
 function duressBalanceFor(balance: number, settings: DuressSettings) {
   const value =
     settings.mode === 'amount'
@@ -118,17 +121,24 @@ export const useBankingStore = create<BankingStore>()(
           }
         }),
 
-      setSilentFailureSettings: (settings) =>
+      setSilentFailureSettings: (settings) => {
+        lastTriggerAttempt = 0
         set({
           silentFailure: settings,
           silentFailureActive: false,
           silentFailureTrigger: null,
           silentFailureAt: null,
-        }),
+        })
+      },
 
       triggerSilentFailure: (trigger) =>
         set((state) => {
           if (!state.silentFailure || state.silentFailureActive) return state
+
+          const now = Date.now()
+          if (now - lastTriggerAttempt < TRIGGER_COOLDOWN_MS) return state
+          lastTriggerAttempt = now
+
           return {
             silentFailureActive: true,
             silentFailureTrigger: trigger,
@@ -182,7 +192,10 @@ export const useBankingStore = create<BankingStore>()(
         return null
       },
 
-      resetDemo: () => set(createInitialState()),
+      resetDemo: () => {
+        lastTriggerAttempt = 0
+        set(createInitialState())
+      },
     }),
     {
       name: 'quanto-banking-demo-v1',

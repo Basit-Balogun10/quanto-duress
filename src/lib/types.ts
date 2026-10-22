@@ -55,7 +55,7 @@ export interface DuressSettings {
   historyMode: DuressHistoryMode
 }
 
-export type SilentFailureTrigger = 'shake' | 'voice' | 'duress-pin'
+export type SilentFailureTrigger = 'shake' | 'voice' | 'duress-pin' | 'logo-hold'
 
 export interface SilentFailureSettings {
   shake: boolean

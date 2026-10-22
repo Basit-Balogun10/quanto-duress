@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { clearDuressDecoyCache, getCachedDuressLedger } from './decoyLedger'
 import { createDuressLedger } from './duressLedger'
 import {
   beneficiaries as seedBeneficiaries,
@@ -50,7 +51,7 @@ function createInitialState(): BankingState {
 const TRIGGER_COOLDOWN_MS = 1500
 let lastTriggerAttempt = 0
 
-function duressBalanceFor(balance: number, settings: DuressSettings) {
+export function duressBalanceFor(balance: number, settings: DuressSettings) {
   const value =
     settings.mode === 'amount'
       ? settings.value
@@ -109,6 +110,7 @@ export const useBankingStore = create<BankingStore>()(
       setDuressSettings: (settings) =>
         set((state) => {
           if (state.duressActive) return state
+          if (!settings) clearDuressDecoyCache()
           return {
             duress: settings,
             duressActive: false,
@@ -177,13 +179,15 @@ export const useBankingStore = create<BankingStore>()(
         if (state.duress && pin === state.duress.pin && pin !== state.pin) {
           if (!state.duressActive) {
             const duressBalance = duressBalanceFor(state.balance, state.duress)
+            const decoyHistory =
+              state.duress.historyMode === 'decoy'
+                ? (getCachedDuressLedger(duressBalance, state.monthlyBudget) ??
+                  createDuressLedger(duressBalance, state.monthlyBudget))
+                : []
             set({
               duressActive: true,
               duressBalance,
-              duressTransactions:
-                state.duress.historyMode === 'decoy'
-                  ? createDuressLedger(duressBalance, state.monthlyBudget)
-                  : [],
+              duressTransactions: decoyHistory,
             })
           }
           return 'duress'
@@ -194,6 +198,7 @@ export const useBankingStore = create<BankingStore>()(
 
       resetDemo: () => {
         lastTriggerAttempt = 0
+        clearDuressDecoyCache()
         set(createInitialState())
       },
     }),

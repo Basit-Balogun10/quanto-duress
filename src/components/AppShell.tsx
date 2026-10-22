@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   House,
   PanelLeftClose,
@@ -8,7 +8,8 @@ import {
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from './Logo'
-import { useBankingStore } from '@/lib/store'
+import { primeDuressDecoy } from '@/lib/decoyLedger'
+import { duressBalanceFor, useBankingStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -21,9 +22,27 @@ const SIDEBAR_KEY = 'quanto-sidebar-collapsed'
 
 export function AppShell() {
   const owner = useBankingStore((state) => state.owner)
+  const balance = useBankingStore((state) => state.balance)
+  const monthlyBudget = useBankingStore((state) => state.monthlyBudget)
+  const duress = useBankingStore((state) => state.duress)
+  const duressActive = useBankingStore((state) => state.duressActive)
+  const silentFailureActive = useBankingStore((state) => state.silentFailureActive)
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(SIDEBAR_KEY) === 'true',
   )
+
+  useEffect(() => {
+    if (
+      !duress ||
+      duress.historyMode !== 'decoy' ||
+      duressActive ||
+      silentFailureActive
+    ) {
+      return
+    }
+
+    void primeDuressDecoy(duressBalanceFor(balance, duress), monthlyBudget)
+  }, [balance, monthlyBudget, duress, duressActive, silentFailureActive])
 
   const toggleSidebar = () => {
     setCollapsed((value) => {

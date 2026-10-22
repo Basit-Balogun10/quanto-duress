@@ -4,31 +4,25 @@ const fs = require('node:fs');
 const SHOTS = process.env.SCREENSHOT_DIR ?? 'test-results/screenshots';
 fs.mkdirSync(SHOTS, { recursive: true });
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
-const KEY = 'quanto-banking-demo-v1';
+const { enterPin: enterTestPin, holdLogo, seedTestAccount, readState, waitForState } = require('./helpers.cjs');
 
 async function enterPin(page, pin) {
-  const first = page.locator('input[aria-label="PIN digit 1"]').last();
-  await first.waitFor({ state: 'visible' });
-  await first.click();
-  await page.keyboard.type(pin, { delay: 30 });
+  await enterTestPin(page, pin);
 }
 
 async function unlockCurrent(page, pin) {
+  await seedTestAccount(page);
   await page.getByRole('heading', { name: 'Unlock your account' }).waitFor();
   await enterPin(page, pin);
   await page.getByText('Account active').waitFor();
 }
 
 async function state(page) {
-  return page.evaluate((key) => JSON.parse(localStorage.getItem(key) || '{}').state, KEY);
+  return readState(page);
 }
 
 async function waitActive(page, value = true) {
-  await page.waitForFunction(
-    ({ key, expected }) =>
-      JSON.parse(localStorage.getItem(key) || '{}').state?.silentFailureActive === expected,
-    { key: KEY, expected: value },
-  );
+  await waitForState(page, value);
 }
 
 async function shake(page) {
@@ -58,11 +52,22 @@ async function setIdle(page, hidden) {
 }
 
 async function recover(page, pin) {
-  await page.getByRole('button', { name: 'Restore connection' }).first().click();
+  const restore = page.getByRole('button', { name: 'Restore connection' }).first();
+  const hidden = !(await restore.isVisible().catch(() => false));
+  if (hidden) {
+    await holdLogo(page);
+  } else {
+    await restore.click();
+  }
   await page.getByRole('dialog', { name: 'Restore connection' }).waitFor();
   await enterPin(page, pin);
-  await page.getByText('Connection restored').waitFor();
-  await waitActive(page, false);
+  if (hidden) {
+    await waitActive(page, false);
+    await page.getByRole('dialog', { name: 'Restore connection' }).waitFor({ state: 'detached' });
+  } else {
+    await page.getByText('Connection restored').waitFor();
+    await waitActive(page, false);
+  }
 }
 
 async function configure(page, { shakeOn = true, micAllowed = true, motionAllowed = true }) {
@@ -194,7 +199,8 @@ test('silent failure hardening and permissions', async ({ browser }) => {
 
   await page.goto(BASE + '/app/settings');
   await unlockCurrent(page, '1234');
-  await page.getByText('Transfers are unavailable').waitFor();
+  assert.strictEqual(await page.getByText('Transfers are unavailable').count(), 0);
+  await page.getByText('Silent failure off').waitFor();
   await recover(page, '2468');
 
   await setIdle(page, true);

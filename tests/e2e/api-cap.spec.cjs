@@ -4,11 +4,9 @@ const fs = require('node:fs');
 const SHOTS = process.env.SCREENSHOT_DIR ?? 'test-results/screenshots';
 fs.mkdirSync(SHOTS, { recursive: true });
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
+const { enterPin: enterTestPin } = require('./helpers.cjs');
 async function enterPin(page, pin) {
-  const first = page.locator('input[aria-label="PIN digit 1"]');
-  await first.waitFor({ state: 'visible' });
-  await first.click();
-  await page.keyboard.type(pin, { delay: 35 });
+  await enterTestPin(page, pin);
 }
 test('transfer API enforces duress caps and PINs', async ({ browser }) => {
   const page = await browser.newPage();

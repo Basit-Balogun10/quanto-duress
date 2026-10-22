@@ -4,7 +4,7 @@ import type { Transaction } from './types'
 const CACHE_KEY = 'quanto-decoy-ledger-v1'
 const MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const REFRESH_AFTER_MS = 12 * 60 * 60 * 1000
-const REQUEST_TIMEOUT_MS = 8_000
+const REQUEST_TIMEOUT_MS = 60_000
 
 interface CachedDecoyLedger {
   balance: number
@@ -16,6 +16,15 @@ interface CachedDecoyLedger {
 }
 
 const inflight = new Map<string, Promise<Transaction[] | null>>()
+let cacheScope: string | null = null
+
+export function setDecoyCacheScope(accountId: string | null) {
+  cacheScope = accountId && accountId.length > 0 ? accountId : null
+}
+
+function cacheKey() {
+  return cacheScope ? `${CACHE_KEY}:${cacheScope}` : null
+}
 
 function decoyApiUrl() {
   const configured = import.meta.env.VITE_DECOY_API_URL
@@ -29,8 +38,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readCache(): CachedDecoyLedger | null {
+  const key = cacheKey()
+  if (!key) return null
+
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
 
     const parsed: unknown = JSON.parse(raw)
@@ -58,8 +70,11 @@ function readCache(): CachedDecoyLedger | null {
 }
 
 function writeCache(value: CachedDecoyLedger) {
+  const key = cacheKey()
+  if (!key) return
+
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(value))
+    localStorage.setItem(key, JSON.stringify(value))
   } catch {
     return
   }
@@ -105,8 +120,11 @@ export function getCachedDuressLedger(
 }
 
 export function clearDuressDecoyCache() {
+  const key = cacheKey()
+  if (!key) return
+
   try {
-    localStorage.removeItem(CACHE_KEY)
+    localStorage.removeItem(key)
   } catch {
     return
   }
@@ -163,7 +181,7 @@ export async function primeDuressDecoy(
     return validateDuressLedger(cached.ledger, balance)
   }
 
-  const key = `${balance}:${monthlyBudget}`
+  const key = `${cacheScope ?? 'none'}:${balance}:${monthlyBudget}`
   const existing = inflight.get(key)
   if (existing) return existing
 

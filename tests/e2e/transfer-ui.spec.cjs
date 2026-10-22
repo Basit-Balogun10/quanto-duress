@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const SHOTS = process.env.SCREENSHOT_DIR ?? 'test-results/screenshots';
 fs.mkdirSync(SHOTS, { recursive: true });
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
-async function enterPin(page){const f=page.locator('input[aria-label="PIN digit 1"]').last();await f.waitFor({state:'visible'});await f.click();await page.keyboard.type('1234',{delay:25});await page.getByText('Account active').waitFor();}
+const { enterPin: enterTestPin } = require('./helpers.cjs');
+async function enterPin(page){await enterTestPin(page,'1234');await page.getByText('Account active').waitFor();}
 test('transfer amount and review layout', async ({ browser }) => {
  const errors=[];
  const page=await browser.newPage({viewport:{width:390,height:844}});

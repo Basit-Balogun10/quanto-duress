@@ -244,6 +244,34 @@ button:disabled {
   }
 }
 
+@keyframes silent-cue {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  10% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  22% {
+    opacity: 0.15;
+  }
+  34% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  46% {
+    opacity: 0.15;
+  }
+  58% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  78% {
+    opacity: 0;
+  }
+}
+
 @keyframes scan-line {
   0% {
     transform: translateY(-100%);
@@ -269,6 +297,10 @@ button:disabled {
 
 .animate-pulse-ring {
   animation: pulse-ring 2.2s ease-out infinite;
+}
+
+.animate-silent-cue {
+  animation: silent-cue 1800ms ease-out both;
 }
 
 .animate-scan-line {

@@ -1,16 +1,16 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { clearDuressDecoyCache, getCachedDuressLedger } from './decoyLedger'
-import { createDuressLedger } from './duressLedger'
 import {
-  beneficiaries as seedBeneficiaries,
-  owner as seedOwner,
-  seedTransactions,
-} from './fixtures'
+  clearDuressDecoyCache,
+  getCachedDuressLedger,
+  setDecoyCacheScope,
+} from './decoyLedger'
+import { createDuressLedger } from './duressLedger'
 import type {
   BankingState,
   Beneficiary,
   DuressSettings,
+  Owner,
   SilentFailureSettings,
   SilentFailureTrigger,
   Transaction,
@@ -20,23 +20,104 @@ import type {
 interface BankingStore extends BankingState {
   commitTransfer: (transaction: Transaction, beneficiary?: Beneficiary) => void
   recordFailedTransfer: (transaction: Transaction) => void
+  fundAccount: (amount: number) => void
   setPin: (pin: string) => void
   setDuressSettings: (settings: DuressSettings | null) => void
   setSilentFailureSettings: (settings: SilentFailureSettings | null) => void
   triggerSilentFailure: (trigger: SilentFailureTrigger) => void
   clearSilentFailure: (pin: string) => boolean
   unlockWithPin: (pin: string) => UnlockResult
-  resetDemo: () => void
 }
 
-function createInitialState(): BankingState {
+export const ACTIVE_ACCOUNT_KEY = 'quanto-active-account-v1'
+export const ACCOUNT_STATE_PREFIX = 'quanto-account-state-v1:'
+
+const BLANK_OWNER: Owner = {
+  name: '',
+  firstName: '',
+  accountNumber: '',
+  bank: 'Quanto',
+  initials: '',
+}
+
+function readActiveAccountId() {
+  try {
+    return localStorage.getItem(ACTIVE_ACCOUNT_KEY)
+  } catch {
+    return null
+  }
+}
+
+let activeAccountId = readActiveAccountId()
+
+setDecoyCacheScope(activeAccountId)
+
+export function accountStateKey(accountId: string) {
+  return `${ACCOUNT_STATE_PREFIX}${accountId}`
+}
+
+export function getActiveAccountId() {
+  return activeAccountId
+}
+
+export function setActiveAccountStateId(accountId: string | null) {
+  activeAccountId = accountId
+  setDecoyCacheScope(accountId)
+}
+
+export function rememberActiveAccountId(accountId: string) {
+  setActiveAccountStateId(accountId)
+  try {
+    localStorage.setItem(ACTIVE_ACCOUNT_KEY, accountId)
+  } catch {
+    return
+  }
+}
+
+export function forgetActiveAccountId() {
+  setActiveAccountStateId(null)
+  try {
+    localStorage.removeItem(ACTIVE_ACCOUNT_KEY)
+  } catch {
+    return
+  }
+}
+
+const accountScopedStorage = {
+  getItem: (_name: string) => {
+    if (!activeAccountId) return null
+    try {
+      return localStorage.getItem(accountStateKey(activeAccountId))
+    } catch {
+      return null
+    }
+  },
+  setItem: (_name: string, value: string) => {
+    if (!activeAccountId) return
+    try {
+      localStorage.setItem(accountStateKey(activeAccountId), value)
+    } catch {
+      return
+    }
+  },
+  removeItem: (_name: string) => {
+    if (!activeAccountId) return
+    try {
+      localStorage.removeItem(accountStateKey(activeAccountId))
+    } catch {
+      return
+    }
+  },
+}
+
+export function createInitialState(owner: Owner, pin: string): BankingState {
   return {
-    owner: seedOwner,
-    balance: 842500,
-    pin: '1234',
+    owner,
+    balance: 0,
+    pin,
     monthlyBudget: 300000,
-    beneficiaries: structuredClone(seedBeneficiaries),
-    transactions: structuredClone(seedTransactions),
+    beneficiaries: [],
+    transactions: [],
     duress: null,
     duressActive: false,
     duressBalance: 0,
@@ -62,7 +143,7 @@ export function duressBalanceFor(balance: number, settings: DuressSettings) {
 export const useBankingStore = create<BankingStore>()(
   persist(
     (set, get) => ({
-      ...createInitialState(),
+      ...createInitialState(BLANK_OWNER, ''),
 
       commitTransfer: (transaction, beneficiary) =>
         set((state) => {
@@ -105,6 +186,31 @@ export const useBankingStore = create<BankingStore>()(
           }
         }),
 
+      fundAccount: (amount) =>
+        set((state) => {
+          if (state.duressActive) return state
+          if (!Number.isInteger(amount) || amount <= 0) return state
+
+          const suffix = Math.random().toString(36).slice(2, 8).toUpperCase()
+          const transaction: Transaction = {
+            id: `tx_test_funds_${Date.now()}_${suffix}`,
+            direction: 'in',
+            amount,
+            counterparty: 'Quanto test funds',
+            bank: 'Quanto',
+            description: 'Test account funding',
+            category: 'transfer',
+            createdAt: new Date().toISOString(),
+            status: 'completed',
+            reference: `QX-${suffix}`,
+          }
+
+          return {
+            balance: state.balance + amount,
+            transactions: [transaction, ...state.transactions],
+          }
+        }),
+
       setPin: (pin) => set({ pin }),
 
       setDuressSettings: (settings) =>
@@ -124,12 +230,15 @@ export const useBankingStore = create<BankingStore>()(
         }),
 
       setSilentFailureSettings: (settings) => {
-        lastTriggerAttempt = 0
-        set({
-          silentFailure: settings,
-          silentFailureActive: false,
-          silentFailureTrigger: null,
-          silentFailureAt: null,
+        set((state) => {
+          if (state.silentFailureActive) return state
+          lastTriggerAttempt = 0
+          return {
+            silentFailure: settings,
+            silentFailureActive: false,
+            silentFailureTrigger: null,
+            silentFailureAt: null,
+          }
         })
       },
 
@@ -195,17 +304,11 @@ export const useBankingStore = create<BankingStore>()(
 
         return null
       },
-
-      resetDemo: () => {
-        lastTriggerAttempt = 0
-        clearDuressDecoyCache()
-        set(createInitialState())
-      },
     }),
     {
-      name: 'quanto-banking-demo-v1',
-      version: 3,
-      storage: createJSONStorage(() => localStorage),
+      name: 'quanto-banking',
+      version: 4,
+      storage: createJSONStorage(() => accountScopedStorage),
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<BankingState>
         const deactivateDuress = version < 3
@@ -232,6 +335,10 @@ export const useBankingStore = create<BankingStore>()(
     },
   ),
 )
+
+export async function rehydrateActiveAccount() {
+  await useBankingStore.persist.rehydrate()
+}
 
 function inCurrentMonth(value: string) {
   const date = new Date(value)

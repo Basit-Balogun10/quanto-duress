@@ -6,10 +6,21 @@ import {
   primeDuressDecoy,
 } from '../../src/lib/decoyLedger'
 import { createDuressLedger, DuressLedgerValidationError } from '../../src/lib/duressLedger'
-import { useBankingStore } from '../../src/lib/store'
-import type { Transaction } from '../../src/lib/types'
+import {
+  createInitialState,
+  setActiveAccountStateId,
+  useBankingStore,
+} from '../../src/lib/store'
+import type { Owner, Transaction } from '../../src/lib/types'
 
 const API_URL = 'https://decoy.test'
+const owner: Owner = {
+  name: 'Decoy Tester',
+  firstName: 'Decoy',
+  accountNumber: '0000000002',
+  bank: 'Quanto',
+  initials: 'DT',
+}
 
 function markedLedger(balance = 50_000): Transaction[] {
   return createDuressLedger(balance, 300_000).map((transaction) => ({
@@ -31,12 +42,17 @@ function mockFetch(ledger: Transaction[], status = 200) {
 
 beforeEach(() => {
   vi.stubEnv('VITE_DECOY_API_URL', API_URL)
-  useBankingStore.getState().resetDemo()
+  setActiveAccountStateId('decoy-test-account')
+  useBankingStore.setState({
+    ...createInitialState(owner, '1234'),
+    balance: 842_500,
+  })
   clearDuressDecoyCache()
 })
 
 afterEach(() => {
   clearDuressDecoyCache()
+  setActiveAccountStateId(null)
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -106,6 +122,15 @@ describe('primeDuressDecoy', () => {
     await primeDuressDecoy(50_000, 300_000)
 
     expect(getCachedDuressLedger(60_000, 300_000)).toBeNull()
+  })
+
+  it('does not reuse a cached ledger across accounts', async () => {
+    mockFetch(markedLedger(50_000))
+    await primeDuressDecoy(50_000, 300_000)
+    expect(getCachedDuressLedger(50_000, 300_000)).not.toBeNull()
+
+    setActiveAccountStateId('another-account')
+    expect(getCachedDuressLedger(50_000, 300_000)).toBeNull()
   })
 })
 

@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   History,
+  Plus,
   Smartphone,
   TrendingDown,
   TrendingUp,
@@ -16,6 +17,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { FundAccountDialog } from '@/components/FundAccountDialog'
 import { TransactionRow } from '@/components/TransactionRow'
 import {
   selectAvailableBalance,
@@ -44,14 +46,18 @@ export function Dashboard() {
   const state = useBankingStore()
   const [showBalance, setShowBalance] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [fundOpen, setFundOpen] = useState(false)
 
   const availableBalance = selectAvailableBalance(state)
   const monthlySpending = selectMonthlySpending(state)
   const monthlyIncome = selectMonthlyIncome(state)
-  const spendingPercentage = Math.min(
-    Math.round((monthlySpending / state.monthlyBudget) * 100),
-    100,
-  )
+  const spendingPercentage =
+    state.monthlyBudget > 0
+      ? Math.min(
+          Math.round((monthlySpending / state.monthlyBudget) * 100),
+          100,
+        )
+      : 0
   const remainingBudget = Math.max(state.monthlyBudget - monthlySpending, 0)
   const recent = selectVisibleTransactions(state).slice(0, 5)
 
@@ -120,7 +126,7 @@ export function Dashboard() {
             </span>
           </div>
 
-          <div className="mt-7 flex items-center justify-between gap-2.5">
+          <div className="mt-7 flex flex-wrap items-center gap-2.5">
             <Link
               to="/app/transfer"
               className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-lumen px-4 py-2.5 text-xs font-semibold text-fathom transition-colors hover:bg-dawn max-[359px]:gap-1.5 max-[359px]:px-2.5 max-[359px]:text-[0.68rem] sm:px-5 sm:py-3 sm:text-sm"
@@ -134,6 +140,16 @@ export function Dashboard() {
             >
               View history
             </Link>
+            {!state.duressActive && (
+              <button
+                type="button"
+                onClick={() => setFundOpen(true)}
+                className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-lumen/20 px-4 py-2.5 text-xs font-semibold text-lumen/85 transition-colors hover:bg-lumen/10 max-[359px]:gap-1.5 max-[359px]:px-2.5 max-[359px]:text-[0.68rem] sm:px-5 sm:py-3 sm:text-sm"
+              >
+                <Plus className="size-4" />
+                Add test money
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -249,11 +265,19 @@ export function Dashboard() {
           </Link>
         </div>
         <div className="mt-2 divide-y divide-line">
-          {recent.map((transaction) => (
-            <TransactionRow key={transaction.id} transaction={transaction} />
-          ))}
+          {recent.length > 0 ? (
+            recent.map((transaction) => (
+              <TransactionRow key={transaction.id} transaction={transaction} />
+            ))
+          ) : (
+            <p className="py-8 text-center text-xs leading-relaxed text-muted">
+              No transactions yet. Add test money to try a transfer.
+            </p>
+          )}
         </div>
       </section>
+
+      {fundOpen && <FundAccountDialog onClose={() => setFundOpen(false)} />}
     </div>
   )
 }

@@ -4,15 +4,14 @@ const fs = require('node:fs');
 const SHOTS = process.env.SCREENSHOT_DIR ?? 'test-results/screenshots';
 fs.mkdirSync(SHOTS, { recursive: true });
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
+const { enterPin: enterTestPin, seedTestAccount, readState } = require('./helpers.cjs');
 
 async function enterPin(page, pin) {
-  const first = page.locator('input[aria-label="PIN digit 1"]');
-  await first.waitFor({ state: 'visible' });
-  await first.click();
-  await page.keyboard.type(pin, { delay: 35 });
+  await enterTestPin(page, pin);
 }
 
 async function unlockCurrent(page, pin) {
+  await seedTestAccount(page);
   await page.getByRole('heading', { name: 'Unlock your account' }).waitFor();
   await enterPin(page, pin);
   await page.getByRole('navigation', { name: 'Main navigation' }).waitFor();
@@ -30,7 +29,7 @@ async function lockAndUnlock(page, pin) {
 }
 
 async function storedState(page) {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('quanto-banking-demo-v1') || '{}').state);
+  return readState(page);
 }
 
 test('duress access, caps, and decoy history', async ({ browser }) => {
@@ -42,7 +41,7 @@ test('duress access, caps, and decoy history', async ({ browser }) => {
   await page.goto(BASE + '/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await page.getByRole('heading', { name: 'Unlock your account' }).waitFor();
+  await seedTestAccount(page);
   await page.screenshot({ path: `${SHOTS}/quanto-lock.png`, fullPage: true });
 
   await enterPin(page, '1234');
@@ -170,7 +169,7 @@ test('duress access, caps, and decoy history', async ({ browser }) => {
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   mobile.on('pageerror', e => errors.push(e.message));
   await mobile.goto(BASE + '/');
-  await mobile.getByRole('heading', { name: 'Unlock your account' }).waitFor();
+  await seedTestAccount(mobile);
   await mobile.screenshot({ path: `${SHOTS}/quanto-lock-mobile.png`, fullPage: true });
   await enterPin(mobile, '1234');
   await mobile.getByRole('heading', { name: 'Ada' }).waitFor();

@@ -5,17 +5,19 @@ import {
   Copy,
   KeyRound,
   Landmark,
+  LockKeyhole,
   Mic,
   Percent,
-  RotateCcw,
   ShieldAlert,
   ShieldCheck,
   Smartphone,
   UserRound,
+  Users,
+  Vibrate,
   WifiOff,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { RecoveryDialog } from '@/components/RecoveryDialog'
+import { lockApp, switchAccount } from '@/lib/session'
+import { playSilentFailureCue } from '@/lib/silentFailureCue'
 import { useBankingStore } from '@/lib/store'
 import {
   getRememberedMicrophoneAccess,
@@ -150,8 +152,7 @@ function PinForm() {
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.65rem] text-muted">PIN: {pin}</p>
+      <div className="mt-4 flex justify-end">
         <button type="button" onClick={save} className="btn-primary px-5 py-2.5 text-xs">
           {saved ? (
             <>
@@ -464,7 +465,9 @@ function DuressForm() {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[0.65rem] text-muted">
-              {duress ? `Duress PIN: ${duress.pin}` : 'Not saved yet'}
+              {duress
+                ? 'Duress PIN saved on this device.'
+                : 'Not saved yet'}
             </p>
             <button
               type="button"
@@ -520,21 +523,22 @@ function AccessStatus({ label, status }: { label: string; status: TriggerAccess 
 
 function SilentFailureForm() {
   const silentFailure = useBankingStore((state) => state.silentFailure)
+  const silentFailureActive = useBankingStore((state) => state.silentFailureActive)
   const duress = useBankingStore((state) => state.duress)
   const pin = useBankingStore((state) => state.pin)
   const setSilentFailureSettings = useBankingStore(
     (state) => state.setSilentFailureSettings,
   )
-  const configured = silentFailure !== null
+  const configured = silentFailure !== null && !silentFailureActive
   const motionAvailable = motionSupported()
   const voiceAvailable = speechSupported()
 
   const [setupOpen, setSetupOpen] = useState(configured)
   const [shake, setShake] = useState(
-    () => (silentFailure?.shake ?? true) && motionAvailable,
+    () => !silentFailureActive && (silentFailure?.shake ?? true) && motionAvailable,
   )
   const [voice, setVoice] = useState(
-    () => (silentFailure?.voice ?? false) && voiceAvailable,
+    () => !silentFailureActive && (silentFailure?.voice ?? false) && voiceAvailable,
   )
   const [motionAccess, setMotionAccess] = useState<TriggerAccess>(() =>
     motionAvailable ? getRememberedMotionAccess() : 'unsupported',
@@ -542,13 +546,20 @@ function SilentFailureForm() {
   const [micAccess, setMicAccess] = useState<TriggerAccess>(() =>
     voiceAvailable ? getRememberedMicrophoneAccess() : 'unsupported',
   )
-  const [phrase, setPhrase] = useState(silentFailure?.phrase ?? 'quanto hold')
-  const [recoverySame, setRecoverySame] = useState(
-    silentFailure ? silentFailure.recoveryUsesDuressPin : Boolean(duress),
+  const [phrase, setPhrase] = useState(
+    () => (silentFailureActive ? 'quanto hold' : silentFailure?.phrase ?? 'quanto hold'),
   )
-  const [recoveryPin, setRecoveryPin] = useState(silentFailure?.recoveryPin ?? '')
+  const [recoverySame, setRecoverySame] = useState(
+    () =>
+      !silentFailureActive &&
+      (silentFailure ? silentFailure.recoveryUsesDuressPin : Boolean(duress)),
+  )
+  const [recoveryPin, setRecoveryPin] = useState(
+    () => (silentFailureActive ? '' : silentFailure?.recoveryPin ?? ''),
+  )
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [cueSent, setCueSent] = useState(false)
   const [saving, setSaving] = useState(false)
   const recoveryUsesDuress = recoverySame && Boolean(duress)
 
@@ -593,6 +604,11 @@ function SilentFailureForm() {
   const save = async () => {
     setSaved(false)
     setError(null)
+
+    if (silentFailureActive) {
+      setError('Security settings are temporarily unavailable. Try again later.')
+      return
+    }
 
     const usableShake = shake && motionAvailable
     const usableVoice = voice && voiceAvailable
@@ -663,7 +679,11 @@ function SilentFailureForm() {
     window.setTimeout(() => setSaved(false), 2500)
   }
 
-  const displayedRecovery = recoveryUsesDuress ? duress?.pin : recoveryPin
+  const previewCue = () => {
+    playSilentFailureCue()
+    setCueSent(true)
+    window.setTimeout(() => setCueSent(false), 1600)
+  }
 
   return (
     <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
@@ -802,6 +822,28 @@ function SilentFailureForm() {
             </div>
           </div>
 
+          <div className="mt-4 flex items-start justify-between gap-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
+            <div className="flex min-w-0 gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                <Vibrate className="size-4" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold">Caught cue</p>
+                <p className="mt-1 text-[0.64rem] leading-relaxed text-muted">
+                  A caught trigger gives a short double pulse where supported, plus a
+                  brief dot near the top-right. It is intentionally easy to miss.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={previewCue}
+              className="shrink-0 rounded-full border border-line bg-lumen px-3 py-1.5 text-[0.6rem] font-semibold text-fathom"
+            >
+              {cueSent ? 'Cue sent' : 'Test cue'}
+            </button>
+          </div>
+
           <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="label-mono text-[0.52rem] text-muted">Device access</p>
@@ -892,8 +934,8 @@ function SilentFailureForm() {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[0.65rem] text-muted">
-              {displayedRecovery
-                ? `Recovery PIN: ${displayedRecovery}`
+              {configured
+                ? 'Recovery PIN saved on this device.'
                 : 'Not saved yet'}
             </p>
             <button
@@ -927,11 +969,7 @@ function SilentFailureForm() {
 
 export function Settings() {
   const state = useBankingStore()
-  const resetDemo = useBankingStore((state) => state.resetDemo)
-  const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
-  const [confirmReset, setConfirmReset] = useState(false)
-  const [recoveryOpen, setRecoveryOpen] = useState(false)
 
   const copyAccount = async () => {
     try {
@@ -943,12 +981,6 @@ export function Settings() {
     }
   }
 
-  const reset = () => {
-    resetDemo()
-    setConfirmReset(false)
-    navigate('/app')
-  }
-
   return (
     <div className="animate-fade-up">
       <p className="label-mono text-[0.58rem] text-fathom">Preferences</p>
@@ -956,38 +988,10 @@ export function Settings() {
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
         {state.duressActive
           ? 'Manage your profile and account details.'
-          : state.silentFailureActive
-            ? 'Manage your profile, account details, and connection status.'
-            : 'Manage your profile, account details, security, and connection safety.'}
+          : 'Manage your profile, account details, security, and connection safety.'}
       </p>
 
       <div className="mt-7 space-y-4">
-        {state.silentFailureActive && (
-          <section className="rounded-3xl border border-flare/35 bg-pulse-soft/45 p-5 sm:p-6">
-            <div className="flex items-start gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-lumen text-danger">
-                <WifiOff className="size-4.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="font-display text-xl font-semibold sm:text-2xl">
-                  Transfers are unavailable
-                </h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  This device cannot reach the bank network. Your balance is safe and no
-                  transfer has left your account.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setRecoveryOpen(true)}
-                  className="btn-primary mt-4 px-5 py-2.5 text-xs"
-                >
-                  Restore connection
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
-
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-line bg-lumen-deep/45 p-5">
           <div className="flex items-center gap-3">
             <span className="flex size-12 items-center justify-center rounded-full bg-dawn font-display text-xl font-semibold text-fathom-deep">
@@ -1042,55 +1046,45 @@ export function Settings() {
           </div>
         </section>
 
-        {!state.duressActive && !state.silentFailureActive && (
+        {!state.duressActive && (
           <>
             <PinForm />
             <DuressForm />
-            <SilentFailureForm />
+            <SilentFailureForm key={state.silentFailureActive ? 'active' : 'idle'} />
 
             <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
               <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-pulse-soft text-pulse">
-                  <RotateCcw className="size-4.5" />
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                  <LockKeyhole className="size-4.5" />
                 </span>
                 <div>
                   <h2 className="font-display text-xl font-semibold sm:text-2xl">
-                    Reset app data
+                    Session
                   </h2>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
-                    Restore the starting balance, recipients, transactions, PINs, duress
-                    access, and silent-failure settings. This clears data stored in this
-                    browser.
+                    Lock this app or move to another account stored in this browser.
                   </p>
                 </div>
               </div>
 
-              {confirmReset ? (
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={reset}
-                    className="rounded-full bg-pulse px-5 py-3 text-xs font-semibold text-lumen hover:opacity-90"
-                  >
-                    Yes, reset everything
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmReset(false)}
-                    className="btn-secondary px-5 py-3 text-xs"
-                  >
-                    Keep my data
-                  </button>
-                </div>
-              ) : (
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => setConfirmReset(true)}
-                  className="btn-secondary mt-4 px-5 py-3 text-xs"
+                  onClick={lockApp}
+                  className="btn-primary px-5 py-3 text-xs"
                 >
-                  Reset app data
+                  <LockKeyhole className="size-3.5" />
+                  Lock app
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={switchAccount}
+                  className="btn-secondary px-5 py-3 text-xs"
+                >
+                  <Users className="size-3.5" />
+                  Switch account
+                </button>
+              </div>
             </section>
           </>
         )}
@@ -1100,10 +1094,6 @@ export function Settings() {
           Profile details, PINs, and transactions are stored on this device.
         </div>
       </div>
-
-      {recoveryOpen && (
-        <RecoveryDialog onClose={() => setRecoveryOpen(false)} />
-      )}
     </div>
   )
 }

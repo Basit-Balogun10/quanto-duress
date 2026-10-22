@@ -3,7 +3,7 @@ import worker from '../../worker/src/index'
 import type { Transaction } from '../../src/lib/types'
 
 const ORIGIN = 'http://localhost:5173'
-const MODEL = '@cf/meta/llama-3.1-8b-instruct'
+const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 const AMOUNTS = [3_000, 2_500, 3_500, 2_000, 4_000, 3_000, 2_500, 3_500, 3_500]
 
 interface DecoyResponse {
@@ -37,6 +37,23 @@ function outgoingTransactions(amounts = AMOUNTS): Transaction[] {
 
 function aiResponse(transactions = outgoingTransactions()) {
   return { response: JSON.stringify({ transactions }) }
+}
+
+function openAiResponse(transactions = outgoingTransactions()) {
+  return {
+    choices: [{ message: { content: JSON.stringify({ transactions }) } }],
+  }
+}
+
+function externalEnvironment(overrides: Record<string, unknown> = {}) {
+  return {
+    ...environment({ AI: undefined }),
+    AI_API_KEY: 'test-openai-key',
+    AI_BASE_URL: 'https://api.openai.test/v1',
+    AI_MODEL: 'gpt-5.4-mini',
+    AI_REASONING_EFFORT: 'high',
+    ...overrides,
+  }
 }
 
 function request(body: unknown, init: RequestInit = {}) {
@@ -104,6 +121,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
@@ -179,6 +197,63 @@ describe('decoy worker', () => {
     const response = await worker.fetch(request({ balance: 50_000, monthlyBudget: 300_000 }), env)
 
     expect(response.status).toBe(502)
+  })
+
+  it('uses an OpenAI-compatible provider with high reasoning', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(openAiResponse()), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const env = externalEnvironment()
+    const response = await worker.fetch(
+      request({ balance: 50_000, monthlyBudget: 300_000 }),
+      env,
+    )
+    const data = (await response.json()) as DecoyResponse
+
+    expect(response.status).toBe(200)
+    expect(data.source).toBe('ai')
+    expect(data.model).toBe('gpt-5.4-mini')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.openai.test/v1/chat/completions',
+      expect.objectContaining({ method: 'POST' }),
+    )
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>
+    expect(body.model).toBe('gpt-5.4-mini')
+    expect(body.reasoning_effort).toBe('high')
+    expect(body.max_completion_tokens).toBe(8_192)
+    expect(body.response_format).toEqual({ type: 'json_object' })
+    expect(Array.isArray(body.messages)).toBe(true)
+  })
+
+  it('falls back to Workers AI when the external provider fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('provider unavailable', { status: 503 })),
+    )
+    const env = environment({
+      AI_API_KEY: 'test-openai-key',
+      AI_BASE_URL: 'https://api.openai.test/v1',
+      AI_MODEL: 'gpt-5.4-mini',
+      AI_REASONING_EFFORT: 'high',
+    })
+
+    const response = await worker.fetch(
+      request({ balance: 50_000, monthlyBudget: 300_000 }),
+      env,
+    )
+    const data = (await response.json()) as DecoyResponse
+
+    expect(response.status).toBe(200)
+    expect(data.model).toBe(MODEL)
+    expect(env.AI.run).toHaveBeenCalledTimes(1)
   })
 
   it('returns a safe error when AI fails or is missing', async () => {

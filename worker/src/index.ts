@@ -1,19 +1,52 @@
 import type { Transaction } from '../../src/lib/types'
 import { validateDuressLedger } from '../../src/lib/duressLedgerValidation'
 
-const PROMPT_VERSION = 'v1'
-const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct'
+const PROMPT_VERSION = 'v2'
+const DEFAULT_WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1'
+const DEFAULT_REASONING_EFFORT = 'high'
+const OPENAI_TIMEOUT_MS = 60_000
+const OPENAI_MAX_COMPLETION_TOKENS = 8_192
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_BODY_BYTES = 4_096
 const MAX_MONEY = 1_000_000_000_000
 const MIN_OUTGOING = 6
 const MAX_OUTGOING = 16
+const REASONING_EFFORTS = new Set([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+])
+
+const SYSTEM_PROMPT =
+  'You create fictional Nigerian personal-bank transaction histories for a decoy account. Return JSON only. Never include real personal data or commentary.'
 
 interface Env {
   AI?: Ai
   DB?: D1Database
+  AI_API_KEY?: string
+  AI_BASE_URL?: string
   AI_MODEL?: string
+  AI_REASONING_EFFORT?: string
+  WORKERS_AI_MODEL?: string
   ALLOWED_ORIGINS?: string
+}
+
+interface ExternalAiConfig {
+  apiKey: string
+  baseUrl: string
+  model: string
+  reasoningEffort: string
+}
+
+interface GeneratedLedger {
+  ledger: Transaction[]
+  model: string
 }
 
 interface LedgerRequest {
@@ -39,6 +72,45 @@ class ApiError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function nonEmpty(value: string | undefined) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+function externalAiConfig(env: Env): ExternalAiConfig | null {
+  const apiKey = nonEmpty(env.AI_API_KEY)
+  if (!apiKey) return null
+
+  const effort = nonEmpty(env.AI_REASONING_EFFORT) ?? DEFAULT_REASONING_EFFORT
+  return {
+    apiKey,
+    baseUrl: nonEmpty(env.AI_BASE_URL) ?? DEFAULT_OPENAI_BASE_URL,
+    model: nonEmpty(env.AI_MODEL) ?? DEFAULT_OPENAI_MODEL,
+    reasoningEffort: REASONING_EFFORTS.has(effort)
+      ? effort
+      : DEFAULT_REASONING_EFFORT,
+  }
+}
+
+function workersAiModel(env: Env) {
+  return nonEmpty(env.WORKERS_AI_MODEL) ?? DEFAULT_WORKERS_AI_MODEL
+}
+
+function activeModel(env: Env) {
+  return externalAiConfig(env)?.model ?? workersAiModel(env)
+}
+
+function aiConfigured(env: Env) {
+  return Boolean(externalAiConfig(env) || env.AI)
+}
+
+function chatCompletionsUrl(baseUrl: string) {
+  const trimmed = baseUrl.replace(/\/+$/, '')
+  return trimmed.endsWith('/chat/completions')
+    ? trimmed
+    : `${trimmed}/chat/completions`
 }
 
 function allowedOrigins(env: Env) {
@@ -216,6 +288,13 @@ function extractText(value: unknown) {
   return typeof value.response === 'string' ? value.response : null
 }
 
+function extractChatText(value: unknown) {
+  if (!isRecord(value) || !Array.isArray(value.choices)) return null
+  const choice = value.choices[0]
+  if (!isRecord(choice) || !isRecord(choice.message)) return null
+  return typeof choice.message.content === 'string' ? choice.message.content : null
+}
+
 function extractTransactions(text: string): unknown[] {
   const cleaned = text
     .trim()
@@ -308,22 +387,78 @@ function buildLedger(raw: unknown[], request: LedgerRequest) {
   return validateDuressLedger([...outgoing, salary], request.balance)
 }
 
-async function generateWithAi(request: LedgerRequest, env: Env, model: string) {
+function aiMessages(request: LedgerRequest) {
+  return [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: buildPrompt(request) },
+  ]
+}
+
+async function generateWithOpenAi(
+  request: LedgerRequest,
+  config: ExternalAiConfig,
+): Promise<GeneratedLedger> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(chatCompletionsUrl(config.baseUrl), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: aiMessages(request),
+        reasoning_effort: config.reasoningEffort,
+        max_completion_tokens: OPENAI_MAX_COMPLETION_TOKENS,
+        response_format: { type: 'json_object' },
+      }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => '')).slice(0, 500)
+      console.error('OpenAI decoy request failed', response.status, detail)
+      throw new ApiError(502, 'Decoy generation is temporarily unavailable.')
+    }
+
+    const data: unknown = await response.json()
+    const text = extractChatText(data)
+    if (!text) {
+      throw new ApiError(502, 'Decoy generation returned an empty response.')
+    }
+
+    return {
+      ledger: buildLedger(extractTransactions(text), request),
+      model: config.model,
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    console.error(
+      'OpenAI decoy request failed',
+      error instanceof Error ? error.message : 'unknown error',
+    )
+    throw new ApiError(502, 'Decoy generation is temporarily unavailable.')
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function generateWithWorkersAi(
+  request: LedgerRequest,
+  env: Env,
+): Promise<GeneratedLedger> {
   if (!env.AI) {
     throw new ApiError(503, 'Decoy generation is not configured.')
   }
 
+  const model = workersAiModel(env)
   let result: unknown
   try {
     result = await env.AI.run(model, {
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You create fictional Nigerian personal-bank transaction histories for a decoy account. Return JSON only. Never include real personal data or commentary.',
-        },
-        { role: 'user', content: buildPrompt(request) },
-      ],
+      messages: aiMessages(request),
       temperature: 0.6,
       max_tokens: 2_048,
     })
@@ -337,7 +472,28 @@ async function generateWithAi(request: LedgerRequest, env: Env, model: string) {
     throw new ApiError(502, 'Decoy generation returned an empty response.')
   }
 
-  return buildLedger(extractTransactions(text), request)
+  return {
+    ledger: buildLedger(extractTransactions(text), request),
+    model,
+  }
+}
+
+async function generateWithAi(request: LedgerRequest, env: Env): Promise<GeneratedLedger> {
+  const external = externalAiConfig(env)
+
+  if (external) {
+    try {
+      return await generateWithOpenAi(request, external)
+    } catch (error) {
+      if (!env.AI) throw error
+      console.error(
+        'External AI failed, falling back to Workers AI',
+        error instanceof Error ? error.message : 'unknown error',
+      )
+    }
+  }
+
+  return generateWithWorkersAi(request, env)
 }
 
 async function readCache(
@@ -399,7 +555,7 @@ async function handle(request: Request, env: Env, origin: string | null) {
 
   if (url.pathname === '/health' && request.method === 'GET') {
     return jsonResponse(
-      { ok: true, ai: Boolean(env.AI), cache: Boolean(env.DB) },
+      { ok: true, ai: aiConfigured(env), cache: Boolean(env.DB) },
       200,
       origin,
       env,
@@ -415,7 +571,7 @@ async function handle(request: Request, env: Env, origin: string | null) {
   }
 
   const payload = await readRequestBody(request)
-  const model = env.AI_MODEL ?? DEFAULT_MODEL
+  const model = activeModel(env)
   const cacheKey = await cacheKeyFor(payload, model)
   const cached = await readCache(cacheKey, payload, env)
 
@@ -433,13 +589,13 @@ async function handle(request: Request, env: Env, origin: string | null) {
     )
   }
 
-  const ledger = await generateWithAi(payload, env, model)
-  await writeCache(cacheKey, ledger, model, env)
+  const generated = await generateWithAi(payload, env)
+  await writeCache(cacheKey, generated.ledger, generated.model, env)
   return jsonResponse(
     {
-      ledger,
+      ledger: generated.ledger,
       source: 'ai',
-      model,
+      model: generated.model,
       generatedAt: new Date().toISOString(),
     },
     200,

@@ -9,9 +9,12 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "quanto-decoy"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "d66fb015-b0d4-428a-a9b3-6bd26b78ec0a"
 migrations_dir = "worker/migrations"
 
 [vars]
-AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
-ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+AI_BASE_URL = "https://api.openai.com/v1"
+AI_MODEL = "gpt-5.4-mini"
+WORKERS_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+AI_REASONING_EFFORT = "high"
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,https://quanto-duress.pages.dev"

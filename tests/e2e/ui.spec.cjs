@@ -4,12 +4,10 @@ const fs = require('node:fs');
 const SHOTS = process.env.SCREENSHOT_DIR ?? 'test-results/screenshots';
 fs.mkdirSync(SHOTS, { recursive: true });
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
+const { enterPin: enterTestPin } = require('./helpers.cjs');
 
 async function enterPin(page, pin = '1234') {
-  const first = page.locator('input[aria-label="PIN digit 1"]').last();
-  await first.waitFor({ state: 'visible' });
-  await first.click();
-  await page.keyboard.type(pin, { delay: 25 });
+  await enterTestPin(page, pin);
   await page.getByText('Account active').waitFor();
 }
 

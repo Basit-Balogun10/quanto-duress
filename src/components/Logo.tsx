@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { Landmark } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { requestSilentFailureRecovery } from '@/lib/silentFailureCue'
 import { useBankingStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
@@ -32,7 +33,7 @@ export function Logo({ className, compact = false, to = '/app' }: LogoProps) {
   useEffect(() => cancelHold, [])
 
   const beginHold = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    if (event.button !== 0 || !silentFailure || silentFailureActive) return
+    if (event.button !== 0 || !silentFailure) return
 
     triggered.current = false
     startPoint.current = { x: event.clientX, y: event.clientY }
@@ -40,8 +41,11 @@ export function Logo({ className, compact = false, to = '/app' }: LogoProps) {
     holdTimer.current = window.setTimeout(() => {
       holdTimer.current = null
       triggered.current = true
-      triggerSilentFailure('logo-hold')
-      if (typeof navigator.vibrate === 'function') navigator.vibrate(30)
+      if (silentFailureActive) {
+        requestSilentFailureRecovery()
+      } else {
+        triggerSilentFailure('logo-hold')
+      }
     }, HOLD_DURATION_MS)
   }
 
@@ -63,7 +67,7 @@ export function Logo({ className, compact = false, to = '/app' }: LogoProps) {
   }
 
   const handleContextMenu = (event: ReactMouseEvent<HTMLAnchorElement>) => {
-    if (silentFailure && !silentFailureActive) event.preventDefault()
+    if (silentFailure) event.preventDefault()
   }
 
   return (

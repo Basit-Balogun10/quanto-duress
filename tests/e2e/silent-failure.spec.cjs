@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const SHOTS = process.env.SCREENSHOT_DIR ?? 'test-results/screenshots';
 fs.mkdirSync(SHOTS, { recursive: true });
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
-const KEY = 'quanto-banking-demo-v1';
+const { enterPin: enterTestPin, holdLogo, seedTestAccount, readState, waitForState } = require('./helpers.cjs');
 
 const naira = new Intl.NumberFormat('en-NG', {
   style: 'currency',
@@ -13,13 +13,11 @@ const naira = new Intl.NumberFormat('en-NG', {
 }).format;
 
 async function enterPin(page, pin) {
-  const first = page.locator('input[aria-label="PIN digit 1"]').last();
-  await first.waitFor({ state: 'visible' });
-  await first.click();
-  await page.keyboard.type(pin, { delay: 30 });
+  await enterTestPin(page, pin);
 }
 
 async function unlockCurrent(page, pin) {
+  await seedTestAccount(page);
   await page.getByRole('heading', { name: 'Unlock your account' }).waitFor();
   await enterPin(page, pin);
   await page.getByText('Account active').waitFor();
@@ -45,15 +43,11 @@ async function lockUnlockHome(page, pin) {
 }
 
 async function state(page) {
-  return page.evaluate((key) => JSON.parse(localStorage.getItem(key) || '{}').state, KEY);
+  return readState(page);
 }
 
 async function waitActive(page, value = true) {
-  await page.waitForFunction(
-    ({ key, expected }) =>
-      JSON.parse(localStorage.getItem(key) || '{}').state?.silentFailureActive === expected,
-    { key: KEY, expected: value },
-  );
+  await waitForState(page, value);
 }
 
 async function shake(page) {
@@ -69,9 +63,16 @@ async function shake(page) {
 }
 
 async function recover(page, pin) {
-  await page.getByRole('button', { name: 'Restore connection' }).first().click();
+  const restore = page.getByRole('button', { name: 'Restore connection' }).first();
+  const hidden = !(await restore.isVisible().catch(() => false));
+  if (hidden) {
+    await holdLogo(page);
+  } else {
+    await restore.click();
+  }
   await page.getByRole('dialog', { name: 'Restore connection' }).waitFor();
   await enterPin(page, pin);
+  return hidden;
 }
 
 test('silent failure triggers, recovery, and decoy history', async ({ browser }) => {
@@ -84,6 +85,14 @@ test('silent failure triggers, recovery, and decoy history', async ({ browser })
   page.on('pageerror', (error) => errors.push(error.message));
 
   await page.addInitScript(() => {
+    window.__vibrationPatterns = [];
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: (pattern) => {
+        window.__vibrationPatterns.push(pattern);
+        return true;
+      },
+    });
     if (!('DeviceMotionEvent' in window)) {
       window.DeviceMotionEvent = class DeviceMotionEvent extends Event {
         constructor(type, init = {}) {
@@ -149,6 +158,8 @@ test('silent failure triggers, recovery, and decoy history', async ({ browser })
   assert.strictEqual(current.silentFailure.recoveryUsesDuressPin, true);
   assert.strictEqual(current.silentFailure.recoveryPin, '4321');
   await page.screenshot({ path: `${SHOTS}/quanto-silent-settings.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Test cue' }).click();
+  await page.getByTestId('silent-failure-cue').waitFor({ state: 'attached' });
   console.log('silent failure configured with shake, voice, and shared recovery PIN');
 
   await page.evaluate(() => {
@@ -158,11 +169,14 @@ test('silent failure triggers, recovery, and decoy history', async ({ browser })
     });
   });
   await waitActive(page, true);
-  await page.getByText('Transfers are unavailable').waitFor();
-  assert.strictEqual(await page.getByRole('heading', { name: 'Transfer PIN' }).count(), 0);
-  assert.strictEqual(await page.getByRole('heading', { name: 'Silent failure' }).count(), 0);
+  await page.waitForFunction(() => window.__vibrationPatterns?.length > 0);
+  const vibrationPatterns = await page.evaluate(() => window.__vibrationPatterns);
+  assert.deepStrictEqual(vibrationPatterns.at(-1), [18, 55, 18]);
+  assert.strictEqual(await page.getByText('Transfers are unavailable').count(), 0);
+  await page.getByText('Silent failure off').waitFor();
+  await page.getByRole('heading', { name: 'Silent failure' }).waitFor();
   await page.screenshot({ path: `${SHOTS}/quanto-silent-active.png`, fullPage: true });
-  console.log('wake phrase triggers persistent failure and hides security settings');
+  console.log('wake phrase triggers persistent failure while settings look untouched');
 
   await gotoApp(page, '/app/transfer', '1234');
   await page.getByRole('button', { name: /Mama Ngozi/ }).click();
@@ -200,9 +214,9 @@ test('silent failure triggers, recovery, and decoy history', async ({ browser })
   await page.getByRole('navigation', { name: 'Main navigation' })
     .getByRole('link', { name: 'Settings' })
     .click();
-  await page.getByText('Transfers are unavailable').waitFor();
+  assert.strictEqual(await page.getByText('Transfers are unavailable').count(), 0);
+  await page.getByText('Silent failure off').waitFor();
   await recover(page, '4321');
-  await page.getByText('Connection restored').waitFor();
   await waitActive(page, false);
   console.log('shake trigger works globally and is recoverable');
 
@@ -283,11 +297,9 @@ test('silent failure triggers, recovery, and decoy history', async ({ browser })
 
   await shake(page);
   await waitActive(page, true);
-  await page.getByRole('button', { name: 'Restore connection' }).click();
-  await enterPin(page, '4321');
+  await recover(page, '4321');
   await page.getByText('That recovery PIN is not correct.').waitFor();
   await enterPin(page, '2468');
-  await page.getByText('Connection restored').waitFor();
   await waitActive(page, false);
   current = await state(page);
   assert.strictEqual(current.silentFailure.recoveryUsesDuressPin, false);

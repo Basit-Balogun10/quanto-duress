@@ -1,7 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { submitTransfer } from '../../src/lib/api'
-import { useBankingStore } from '../../src/lib/store'
-import type { Beneficiary, TransferInput } from '../../src/lib/types'
+import {
+  createInitialState,
+  setActiveAccountStateId,
+  useBankingStore,
+} from '../../src/lib/store'
+import type { Beneficiary, Owner, TransferInput } from '../../src/lib/types'
+
+const owner: Owner = {
+  name: 'Test Owner',
+  firstName: 'Test',
+  accountNumber: '0000000001',
+  bank: 'Quanto',
+  initials: 'TO',
+}
+
+const existingBeneficiary: Beneficiary = {
+  id: 'ben_existing',
+  name: 'Existing Recipient',
+  bank: 'Access Bank',
+  accountNumber: '1111111111',
+  initials: 'ER',
+}
 
 const recipient: Beneficiary = {
   id: 'ben_test',
@@ -56,7 +76,12 @@ async function expectTransferFailure(input: TransferInput, message: RegExp) {
 }
 
 beforeEach(() => {
-  useBankingStore.getState().resetDemo()
+  setActiveAccountStateId('unit-transfer-account')
+  useBankingStore.setState({
+    ...createInitialState(owner, '1234'),
+    balance: 842_500,
+    beneficiaries: [existingBeneficiary],
+  })
 })
 
 describe('submitTransfer caps', () => {
@@ -170,6 +195,27 @@ describe('submitTransfer side effects', () => {
     expect(after.balance).toBe(before.balance)
     expect(after.duressBalance).toBe(before.duressBalance)
     expect(after.transactions[0]?.status).toBe('failed')
+  })
+
+  it('keeps silent failure active when settings are changed through the store', () => {
+    const store = useBankingStore.getState()
+    store.setSilentFailureSettings({
+      shake: true,
+      voice: false,
+      phrase: 'quanto hold',
+      recoveryPin: '9999',
+      recoveryUsesDuressPin: false,
+    })
+    store.triggerSilentFailure('shake')
+
+    const active = useBankingStore.getState()
+    expect(active.silentFailureActive).toBe(true)
+
+    active.setSilentFailureSettings(null)
+
+    const after = useBankingStore.getState()
+    expect(after.silentFailureActive).toBe(true)
+    expect(after.silentFailure).not.toBeNull()
   })
 
   it('does not duplicate an existing beneficiary', async () => {

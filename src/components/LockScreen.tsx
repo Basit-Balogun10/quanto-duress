@@ -53,7 +53,7 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
               <LockKeyhole className="size-5" />
             </span>
             <p className="label-mono mt-6 text-[0.58rem] text-muted">Welcome back</p>
-            <h1 className="display mt-2 text-4xl sm:text-5xl">Unlock your account.</h1>
+            <h1 className="display mt-2 text-3xl sm:text-5xl">Unlock your account</h1>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               Enter your 4-digit PIN to continue to your Quanto account.
             </p>
@@ -74,15 +74,10 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
 
             {!duressActive && (
               <p className="mt-5 border-t border-line pt-3 text-center font-mono text-[0.56rem] uppercase tracking-wider text-muted/60">
-                Demo PIN: {pin}
+                PIN: {pin}
               </p>
             )}
           </div>
-
-          <p className="mt-5 flex items-center justify-center gap-2 text-center text-[0.62rem] leading-relaxed text-muted">
-            <ShieldCheck className="size-3.5 shrink-0 text-fathom" />
-            Local demo. No real bank connection.
-          </p>
         </div>
       </main>
     </div>

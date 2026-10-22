@@ -185,7 +185,7 @@ export function Transfer() {
       <div className="mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="label-mono text-[0.58rem] text-fathom">New transfer</p>
-          <h1 className="display mt-2 text-4xl sm:text-5xl">Send money.</h1>
+          <h1 className="display mt-2 text-3xl sm:text-5xl">Send money</h1>
         </div>
         <p className="text-sm text-muted">
           Available{' '}
@@ -236,7 +236,7 @@ export function Transfer() {
         {step === 'recipient' && (
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-display text-2xl font-semibold">Who are you paying?</h2>
+              <h2 className="font-display text-xl font-semibold sm:text-2xl">Who are you paying?</h2>
               <div className="flex rounded-full border border-line bg-lumen p-1">
                 <button
                   type="button"
@@ -419,7 +419,7 @@ export function Transfer() {
               </button>
             </div>
 
-            <h2 className="mt-6 font-display text-2xl font-semibold">How much?</h2>
+            <h2 className="mt-6 font-display text-xl font-semibold sm:text-2xl">How much?</h2>
             <div className="mt-3 rounded-2xl border border-line bg-lumen-deep/45 p-4">
               <label htmlFor="transfer-amount" className="label-mono text-[0.55rem] text-muted">
                 Amount
@@ -436,7 +436,7 @@ export function Transfer() {
                   inputMode="numeric"
                   placeholder="0"
                   autoComplete="off"
-                  className="min-w-0 flex-1 bg-transparent font-display text-5xl font-semibold tracking-[-0.04em] outline-none placeholder:text-lumen-dark sm:text-6xl"
+                  className="min-w-0 flex-1 bg-transparent font-display text-4xl font-semibold tracking-[-0.04em] outline-none placeholder:text-lumen-dark sm:text-6xl"
                 />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
@@ -499,14 +499,14 @@ export function Transfer() {
 
         {step === 'review' && selected && (
           <div>
-            <h2 className="font-display text-2xl font-semibold">Review and confirm</h2>
+            <h2 className="font-display text-xl font-semibold sm:text-2xl">Review and confirm</h2>
             <p className="mt-1 text-xs text-muted">
               Check the details before entering your PIN.
             </p>
 
             <div className="mt-5 rounded-2xl border border-line bg-lumen-deep/40 p-5 text-center">
               <p className="label-mono text-[0.52rem] text-muted">You are sending</p>
-              <p className="mt-2 font-display text-5xl font-semibold tracking-[-0.05em]">
+              <p className="mt-2 font-display text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">
                 {formatNaira(numericAmount)}
               </p>
               <p className="mt-1 text-sm text-muted">to {selected.name}</p>
@@ -533,7 +533,7 @@ export function Transfer() {
 
             <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-lumen-deep/55 p-3.5 text-[0.68rem] leading-relaxed text-muted">
               <Info className="mt-0.5 size-3.5 shrink-0 text-fathom" />
-              This demo processes transfers instantly using local mock data.
+              Transfers are processed instantly.
             </div>
 
             <div className="mt-5 flex gap-2">
@@ -565,8 +565,8 @@ export function Transfer() {
               <WifiOff className="size-6" />
             </span>
             <p className="label-mono mt-5 text-[0.56rem] text-danger">Transfer failed</p>
-            <h2 className="mx-auto mt-2 max-w-sm font-display text-3xl font-semibold tracking-[-0.035em]">
-              We couldn&apos;t reach the network.
+            <h2 className="mx-auto mt-2 max-w-sm font-display text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">
+              We couldn&apos;t reach the network
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted">
               No money has left your account. Check your connection and try again.
@@ -639,7 +639,7 @@ export function Transfer() {
                 <LockKeyhole className="size-5" />
               </span>
               <p className="label-mono mt-4 text-[0.56rem] text-muted">Confirm transfer</p>
-              <p className="mt-2 font-display text-4xl font-semibold tracking-[-0.04em]">
+              <p className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
                 {formatNaira(numericAmount)}
               </p>
               <p className="mt-1 text-sm text-muted">to {selected.name}</p>
@@ -671,7 +671,7 @@ export function Transfer() {
 
             {!state.duressActive && (
               <p className="mt-5 border-t border-line pt-3 text-center font-mono text-[0.56rem] uppercase tracking-wider text-muted/60">
-                Demo PIN: {state.pin}
+                PIN: {state.pin}
               </p>
             )}
           </div>

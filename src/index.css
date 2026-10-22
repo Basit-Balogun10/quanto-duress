@@ -1,9 +1,41 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "JetBrains Mono Nerd Font";
+  src: url("/fonts/jetbrains-mono-nerd-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Nerd Font";
+  src: url("/fonts/jetbrains-mono-nerd-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Nerd Font";
+  src: url("/fonts/jetbrains-mono-nerd-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Nerd Font";
+  src: url("/fonts/jetbrains-mono-nerd-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 @theme {
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "EB Garamond", ui-serif, Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-mono: "JetBrains Mono Nerd Font", ui-monospace, monospace;
 
   --color-lumen: #ffffeb;
   --color-lumen-deep: #f7f7e8;
@@ -77,12 +109,14 @@ p {
   text-wrap: pretty;
 }
 
-button,
-a,
-input,
-select,
-textarea {
-  font: inherit;
+@layer base {
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
 button,

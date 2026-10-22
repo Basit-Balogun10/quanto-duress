@@ -24,7 +24,7 @@ export function TransferReceipt({ transaction, onDone }: TransferReceiptProps) {
 
         <div className="mt-5 text-center">
           <p className="label-mono text-[0.58rem] text-success">Transfer successful</p>
-          <p className="mt-2 font-display text-5xl font-semibold tracking-[-0.05em]">
+          <p className="mt-2 font-display text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">
             {formatNaira(transaction.amount)}
           </p>
           <p className="mt-2 text-sm text-muted">

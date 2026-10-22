@@ -8,8 +8,12 @@ import {
   Eye,
   EyeOff,
   History,
+  Smartphone,
   TrendingDown,
   TrendingUp,
+  Tv,
+  Wifi,
+  Zap,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { TransactionRow } from '@/components/TransactionRow'
@@ -29,6 +33,13 @@ function greeting() {
   return 'Good evening'
 }
 
+const services = [
+  { label: 'Airtime', detail: 'Top up any network', icon: Smartphone },
+  { label: 'Data', detail: 'Stay connected', icon: Wifi },
+  { label: 'Electricity', detail: 'Prepaid and postpaid', icon: Zap },
+  { label: 'Cable TV', detail: 'Renew your plan', icon: Tv },
+]
+
 export function Dashboard() {
   const state = useBankingStore()
   const [showBalance, setShowBalance] = useState(true)
@@ -42,7 +53,6 @@ export function Dashboard() {
     100,
   )
   const remainingBudget = Math.max(state.monthlyBudget - monthlySpending, 0)
-  const favorites = state.beneficiaries.filter((beneficiary) => beneficiary.favorite)
   const recent = selectVisibleTransactions(state).slice(0, 5)
 
   const copyAccountNumber = async () => {
@@ -60,7 +70,7 @@ export function Dashboard() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="label-mono text-[0.58rem] text-muted">{greeting()}</p>
-          <h1 className="display mt-2 text-4xl sm:text-5xl">{state.owner.firstName}.</h1>
+          <h1 className="display mt-2 text-3xl sm:text-5xl">{state.owner.firstName}</h1>
         </div>
         <Link
           to="/app/activity"
@@ -88,13 +98,11 @@ export function Dashboard() {
             </button>
           </div>
 
-          <p className="mt-3 font-display text-[clamp(2.8rem,9vw,4.5rem)] font-semibold leading-none tracking-[-0.055em]">
+          <p className="mt-3 font-display text-[clamp(2.6rem,8.5vw,4.5rem)] font-semibold leading-none tracking-[-0.055em]">
             {showBalance ? formatNaira(availableBalance) : '₦••••••'}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-lumen/55">
-            <span>{state.owner.bank}</span>
-            <span className="text-lumen/25">·</span>
             <button
               type="button"
               onClick={copyAccountNumber}
@@ -112,21 +120,53 @@ export function Dashboard() {
             </span>
           </div>
 
-          <div className="mt-7 flex flex-wrap gap-2.5">
+          <div className="mt-7 flex items-center justify-between gap-2.5">
             <Link
               to="/app/transfer"
-              className="inline-flex items-center gap-2 rounded-full bg-lumen px-5 py-3 text-sm font-semibold text-fathom transition-colors hover:bg-dawn"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-lumen px-4 py-2.5 text-xs font-semibold text-fathom transition-colors hover:bg-dawn max-[359px]:gap-1.5 max-[359px]:px-2.5 max-[359px]:text-[0.68rem] sm:px-5 sm:py-3 sm:text-sm"
             >
               Send money
               <ArrowUpRight className="size-4" />
             </Link>
             <Link
               to="/app/activity"
-              className="inline-flex items-center gap-2 rounded-full border border-lumen/20 px-5 py-3 text-sm font-semibold text-lumen/85 transition-colors hover:bg-lumen/10"
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-lumen/20 px-4 py-2.5 text-xs font-semibold text-lumen/85 transition-colors hover:bg-lumen/10 max-[359px]:gap-1.5 max-[359px]:px-2.5 max-[359px]:text-[0.68rem] sm:px-5 sm:py-3 sm:text-sm"
             >
               View history
             </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="label-mono text-[0.55rem] text-muted">Services</p>
+            <h2 className="mt-1.5 font-display text-xl font-semibold sm:text-2xl">
+              Pay bills and top up
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Airtime, data, electricity, and cable TV, all from your account.
+            </p>
+          </div>
+          <span className="hidden shrink-0 rounded-full bg-fathom-soft px-3 py-1.5 text-[0.6rem] font-medium text-fathom sm:inline-flex">
+            Everyday essentials
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {services.map(({ label, detail, icon: Icon }) => (
+            <div
+              key={label}
+              className="rounded-2xl border border-line bg-lumen-deep/45 p-3.5"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-dawn text-fathom-deep">
+                <Icon className="size-4" />
+              </span>
+              <p className="mt-3 text-xs font-semibold">{label}</p>
+              <p className="mt-0.5 text-[0.62rem] leading-relaxed text-muted">{detail}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -135,7 +175,7 @@ export function Dashboard() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="label-mono text-[0.55rem] text-muted">This month</p>
-              <h2 className="mt-1.5 font-display text-2xl font-semibold">Spending</h2>
+              <h2 className="mt-1.5 font-display text-xl font-semibold sm:text-2xl">Spending</h2>
             </div>
             <span className="flex size-9 items-center justify-center rounded-full bg-dawn text-fathom-deep">
               <TrendingDown className="size-4" />
@@ -144,7 +184,7 @@ export function Dashboard() {
 
           <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="font-display text-4xl font-semibold tracking-[-0.04em]">
+              <p className="font-display text-2xl font-semibold tracking-[-0.04em] sm:text-4xl">
                 {formatNaira(monthlySpending)}
               </p>
               <p className="mt-1 text-xs text-muted">
@@ -184,7 +224,7 @@ export function Dashboard() {
               <TrendingUp className="size-4" />
             </span>
           </div>
-          <p className="mt-6 font-display text-4xl font-semibold tracking-[-0.04em]">
+          <p className="mt-6 font-display text-2xl font-semibold tracking-[-0.04em] sm:text-4xl">
             {formatNaira(monthlyIncome)}
           </p>
           <p className="mt-1 text-xs text-muted">Received this month</p>
@@ -197,67 +237,23 @@ export function Dashboard() {
         </section>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
-        <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl font-semibold">Recent activity</h2>
-            <Link
-              to="/app/activity"
-              className="flex items-center gap-1 text-xs font-medium text-fathom hover:underline"
-            >
-              See all
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </div>
-          <div className="mt-2 divide-y divide-line">
-            {recent.map((transaction) => (
-              <TransactionRow key={transaction.id} transaction={transaction} />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-line bg-lumen-deep/55 p-5 sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="label-mono text-[0.55rem] text-muted">Saved</p>
-              <h2 className="mt-1.5 font-display text-2xl font-semibold">Quick send</h2>
-            </div>
-            <Link
-              to="/app/transfer"
-              className="text-[0.65rem] font-medium text-fathom hover:underline"
-            >
-              All recipients
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-2">
-            {favorites.map((beneficiary) => (
-              <Link
-                key={beneficiary.id}
-                to={`/app/transfer?to=${beneficiary.id}`}
-                className="flex items-center gap-3 rounded-2xl border border-line bg-lumen p-3 transition-colors hover:border-fathom/30"
-              >
-                <span className="flex size-10 items-center justify-center rounded-full bg-dawn font-display text-sm font-semibold text-fathom-deep">
-                  {beneficiary.initials}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{beneficiary.name}</span>
-                  <span className="block text-[0.65rem] text-muted">{beneficiary.bank}</span>
-                </span>
-                <ChevronRight className="size-4 text-muted" />
-              </Link>
-            ))}
-          </div>
-
+      <section className="rounded-3xl border border-line bg-lumen p-5 sm:p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-semibold sm:text-2xl">Recent activity</h2>
           <Link
-            to="/app/transfer"
-            className="mt-4 flex items-center justify-between rounded-2xl bg-fathom px-4 py-3 text-sm font-semibold text-lumen transition-colors hover:bg-fathom-deep"
+            to="/app/activity"
+            className="flex items-center gap-1 text-xs font-medium text-fathom hover:underline"
           >
-            New transfer
-            <ArrowUpRight className="size-4" />
+            See all
+            <ArrowRight className="size-3.5" />
           </Link>
-        </section>
-      </div>
+        </div>
+        <div className="mt-2 divide-y divide-line">
+          {recent.map((transaction) => (
+            <TransactionRow key={transaction.id} transaction={transaction} />
+          ))}
+        </div>
+      </section>
     </div>
   )
 }

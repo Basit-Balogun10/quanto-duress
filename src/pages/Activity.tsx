@@ -61,7 +61,7 @@ function TransactionDetail({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="label-mono text-[0.55rem] text-muted">Transaction details</p>
-            <p className="mt-2 font-display text-4xl font-semibold tracking-[-0.045em]">
+            <p className="mt-2 font-display text-2xl font-semibold tracking-[-0.045em] sm:text-4xl">
               {incoming ? '+' : '−'}
               {formatNaira(transaction.amount)}
             </p>
@@ -144,7 +144,7 @@ export function Activity() {
   return (
     <div className="animate-fade-up">
       <p className="label-mono text-[0.58rem] text-fathom">Your money</p>
-      <h1 className="display mt-2 text-4xl sm:text-5xl">Activity.</h1>
+      <h1 className="display mt-2 text-3xl sm:text-5xl">Activity</h1>
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
         Every payment in and out of your account, with the details you need to keep track.
       </p>
@@ -157,7 +157,7 @@ export function Activity() {
               <ArrowDownLeft className="size-4" />
             </span>
           </div>
-          <p className="mt-4 font-display text-4xl font-semibold tracking-[-0.04em]">
+          <p className="mt-4 font-display text-2xl font-semibold tracking-[-0.04em] sm:text-4xl">
             {formatNaira(moneyIn)}
           </p>
         </div>
@@ -168,7 +168,7 @@ export function Activity() {
               <ArrowUpRight className="size-4" />
             </span>
           </div>
-          <p className="mt-4 font-display text-4xl font-semibold tracking-[-0.04em]">
+          <p className="mt-4 font-display text-2xl font-semibold tracking-[-0.04em] sm:text-4xl">
             {formatNaira(moneyOut)}
           </p>
         </div>
@@ -220,7 +220,7 @@ export function Activity() {
       </section>
 
       <p className="mt-4 text-center text-[0.62rem] text-muted">
-        This demo stores activity in your browser only.
+        Activity is stored on this device.
       </p>
 
       {selected && (

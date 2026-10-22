@@ -19,7 +19,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/app" replace />} />
-      <Route path="/app" element={<AppShell onLock={() => setLocked(true)} />}>
+      <Route path="/app" element={<AppShell />}>
         <Route index element={<Dashboard />} />
         <Route path="activity" element={<Activity />} />
         <Route path="transfer" element={<Transfer />} />

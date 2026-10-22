@@ -112,7 +112,7 @@ function PinForm() {
           <KeyRound className="size-4.5" />
         </span>
         <div>
-          <h2 className="font-display text-2xl font-semibold">Transfer PIN</h2>
+          <h2 className="font-display text-xl font-semibold sm:text-2xl">Transfer PIN</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             Use a 4-digit PIN to unlock the app and authorize every transfer from your
             account.
@@ -151,7 +151,7 @@ function PinForm() {
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.65rem] text-muted">Demo PIN: {pin}</p>
+        <p className="text-[0.65rem] text-muted">PIN: {pin}</p>
         <button type="button" onClick={save} className="btn-primary px-5 py-2.5 text-xs">
           {saved ? (
             <>
@@ -249,7 +249,7 @@ function DuressForm() {
           <ShieldAlert className="size-4.5" />
         </span>
         <div>
-          <h2 className="font-display text-2xl font-semibold">Duress access</h2>
+          <h2 className="font-display text-xl font-semibold sm:text-2xl">Duress access</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             Opt in to a second PIN that shows a limited balance and caps how much can be
             sent. It is off until you set it up.
@@ -445,7 +445,7 @@ function DuressForm() {
             <p className="label-mono text-[0.52rem] text-muted">
               Balance shown in duress mode
             </p>
-            <p className="mt-1.5 font-display text-3xl font-semibold tracking-[-0.04em]">
+            <p className="mt-1.5 font-display text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">
               {formatNaira(preview)}
             </p>
             <p className="mt-1 text-[0.66rem] leading-relaxed text-muted">
@@ -464,7 +464,7 @@ function DuressForm() {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[0.65rem] text-muted">
-              {duress ? `Demo duress PIN: ${duress.pin}` : 'Not saved yet'}
+              {duress ? `Duress PIN: ${duress.pin}` : 'Not saved yet'}
             </p>
             <button
               type="button"
@@ -672,7 +672,7 @@ function SilentFailureForm() {
           <WifiOff className="size-4.5" />
         </span>
         <div>
-          <h2 className="font-display text-2xl font-semibold">Silent failure</h2>
+          <h2 className="font-display text-xl font-semibold sm:text-2xl">Silent failure</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             Opt in to a hidden safety mode. Once triggered, transfers stop with a realistic
             network error until your recovery PIN is entered. It is off until you set it up.
@@ -893,7 +893,7 @@ function SilentFailureForm() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[0.65rem] text-muted">
               {displayedRecovery
-                ? `Demo recovery PIN: ${displayedRecovery}`
+                ? `Recovery PIN: ${displayedRecovery}`
                 : 'Not saved yet'}
             </p>
             <button
@@ -952,7 +952,7 @@ export function Settings() {
   return (
     <div className="animate-fade-up">
       <p className="label-mono text-[0.58rem] text-fathom">Preferences</p>
-      <h1 className="display mt-2 text-4xl sm:text-5xl">Settings.</h1>
+      <h1 className="display mt-2 text-3xl sm:text-5xl">Settings</h1>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
         {state.duressActive
           ? 'Manage your profile and account details.'
@@ -969,7 +969,7 @@ export function Settings() {
                 <WifiOff className="size-4.5" />
               </span>
               <div className="min-w-0 flex-1">
-                <h2 className="font-display text-2xl font-semibold">
+                <h2 className="font-display text-xl font-semibold sm:text-2xl">
                   Transfers are unavailable
                 </h2>
                 <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -996,7 +996,7 @@ export function Settings() {
             <div>
               <p className="text-sm font-semibold">{state.owner.name}</p>
               <p className="mt-0.5 text-xs text-muted">
-                {state.owner.bank} · Personal account
+                Personal account
               </p>
             </div>
           </div>
@@ -1012,7 +1012,7 @@ export function Settings() {
               <Landmark className="size-4.5" />
             </span>
             <div>
-              <h2 className="font-display text-2xl font-semibold">Account details</h2>
+              <h2 className="font-display text-xl font-semibold sm:text-2xl">Account details</h2>
               <p className="mt-1 text-xs leading-relaxed text-muted">
                 Share these details to receive money into your Quanto account.
               </p>
@@ -1054,10 +1054,13 @@ export function Settings() {
                   <RotateCcw className="size-4.5" />
                 </span>
                 <div>
-                  <h2 className="font-display text-2xl font-semibold">Reset demo</h2>
+                  <h2 className="font-display text-xl font-semibold sm:text-2xl">
+                    Reset app data
+                  </h2>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     Restore the starting balance, recipients, transactions, PINs, duress
-                    access, and silent-failure settings. This clears browser-stored demo data.
+                    access, and silent-failure settings. This clears data stored in this
+                    browser.
                   </p>
                 </div>
               </div>
@@ -1076,7 +1079,7 @@ export function Settings() {
                     onClick={() => setConfirmReset(false)}
                     className="btn-secondary px-5 py-3 text-xs"
                   >
-                    Keep my demo data
+                    Keep my data
                   </button>
                 </div>
               ) : (
@@ -1085,7 +1088,7 @@ export function Settings() {
                   onClick={() => setConfirmReset(true)}
                   className="btn-secondary mt-4 px-5 py-3 text-xs"
                 >
-                  Reset demo data
+                  Reset app data
                 </button>
               )}
             </section>
@@ -1094,8 +1097,7 @@ export function Settings() {
 
         <div className="flex items-start gap-2.5 rounded-2xl border border-line bg-lumen-deep/35 p-4 text-[0.66rem] leading-relaxed text-muted">
           <UserRound className="mt-0.5 size-3.5 shrink-0 text-fathom" />
-          This is a local demo. Profile details, PINs, and transactions are stored in your
-          browser and are not connected to a real bank.
+          Profile details, PINs, and transactions are stored on this device.
         </div>
       </div>
 

@@ -74,7 +74,9 @@ export function RecoveryDialog({ onClose, onRestored }: RecoveryDialogProps) {
         {restored ? (
           <div className="mt-5">
             <p className="label-mono text-[0.56rem] text-fathom">Connection restored</p>
-            <h2 className="mt-2 font-display text-3xl font-semibold">You are back online.</h2>
+            <h2 className="mt-2 font-display text-2xl font-semibold sm:text-3xl">
+              You are back online
+            </h2>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               Transfers are available again. Your balance and account activity are unchanged.
             </p>
@@ -83,7 +85,9 @@ export function RecoveryDialog({ onClose, onRestored }: RecoveryDialogProps) {
           <>
             <div className="mt-5">
               <p className="label-mono text-[0.56rem] text-muted">Recovery</p>
-              <h2 className="mt-2 font-display text-3xl font-semibold">Restore connection.</h2>
+              <h2 className="mt-2 font-display text-2xl font-semibold sm:text-3xl">
+                Restore connection
+              </h2>
               <p className="mt-3 text-sm leading-relaxed text-muted">
                 Enter your recovery PIN to reconnect this device and enable transfers.
               </p>

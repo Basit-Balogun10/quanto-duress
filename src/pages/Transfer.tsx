@@ -540,7 +540,7 @@ export function Transfer() {
               <button
                 type="button"
                 onClick={() => setStep('amount')}
-                className="btn-secondary flex-1 py-3.5 text-sm"
+                className="btn-secondary flex-1 py-3 text-xs"
               >
                 Edit
               </button>
@@ -550,10 +550,10 @@ export function Transfer() {
                   setPinError(null)
                   setStep('pin')
                 }}
-                className="btn-primary flex-[1.4] py-3.5 text-sm"
+                className="btn-primary flex-[1.2] py-3 text-xs"
               >
                 Confirm transfer
-                <LockKeyhole className="size-4" />
+                <LockKeyhole className="size-3.5" />
               </button>
             </div>
           </div>

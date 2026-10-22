@@ -4,6 +4,7 @@ import { AppShell } from '@/components/AppShell'
 import { LockScreen } from '@/components/LockScreen'
 import { SilentFailureCue } from '@/components/SilentFailureCue'
 import { SilentFailureRecovery } from '@/components/SilentFailureRecovery'
+import { useDecoyPrewarm } from '@/hooks/useDecoyPrewarm'
 import { useSilentFailureCue } from '@/hooks/useSilentFailureCue'
 import { useSilentFailureTriggers } from '@/hooks/useSilentFailureTriggers'
 import { Activity } from '@/pages/Activity'
@@ -15,6 +16,7 @@ function App() {
   const [locked, setLocked] = useState(true)
   useSilentFailureTriggers()
   useSilentFailureCue()
+  useDecoyPrewarm()
 
   if (locked) {
     return (

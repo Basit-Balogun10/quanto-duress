@@ -63,6 +63,7 @@ export interface SilentFailureSettings {
   phrase: string
   recoveryPin: string
   recoveryUsesDuressPin: boolean
+  muteSound?: boolean
 }
 
 export interface BankingState {

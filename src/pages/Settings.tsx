@@ -14,10 +14,14 @@ import {
   UserRound,
   Users,
   Vibrate,
+  Volume2,
   WifiOff,
 } from 'lucide-react'
 import { lockApp, switchAccount } from '@/lib/session'
-import { playSilentFailureCue } from '@/lib/silentFailureCue'
+import {
+  playSilentFailureCue,
+  primeSilentFailureCueSound,
+} from '@/lib/silentFailureCue'
 import { useBankingStore } from '@/lib/store'
 import {
   getRememberedMicrophoneAccess,
@@ -560,6 +564,9 @@ function SilentFailureForm() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [cueSent, setCueSent] = useState(false)
+  const [muteSound, setMuteSound] = useState(
+    () => !silentFailureActive && (silentFailure?.muteSound ?? false),
+  )
   const [saving, setSaving] = useState(false)
   const recoveryUsesDuress = recoverySame && Boolean(duress)
 
@@ -588,6 +595,7 @@ function SilentFailureForm() {
     )
     setError(null)
     setSaved(false)
+    setMuteSound(false)
   }
 
   const toggle = () => {
@@ -674,13 +682,14 @@ function SilentFailureForm() {
       phrase: phrase.trim(),
       recoveryPin: recovery,
       recoveryUsesDuressPin: recoveryUsesDuress,
+      muteSound,
     })
     setSaved(true)
     window.setTimeout(() => setSaved(false), 2500)
   }
 
   const previewCue = () => {
-    playSilentFailureCue()
+    playSilentFailureCue({ muted: muteSound })
     setCueSent(true)
     window.setTimeout(() => setCueSent(false), 1600)
   }
@@ -842,6 +851,36 @@ function SilentFailureForm() {
             >
               {cueSent ? 'Cue sent' : 'Test cue'}
             </button>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-line bg-lumen-deep/40 px-4 py-3.5">
+            <div className="flex min-w-0 gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-lumen-dark text-fathom">
+                <Volume2 className="size-4" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold">Cue sound</p>
+                <p className="mt-1 text-[0.64rem] leading-relaxed text-muted">
+                  A subtle two-note sound plays with the cue. Turn on mute to keep the
+                  vibration and dot only.
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <Switch
+                checked={muteSound}
+                onChange={() => {
+                  const next = !muteSound
+                  if (!next) primeSilentFailureCueSound()
+                  setMuteSound(next)
+                  setError(null)
+                }}
+                label="Mute cue sound"
+              />
+              <span className="text-[0.56rem] font-medium text-muted">
+                {muteSound ? 'Muted' : 'Sound on'}
+              </span>
+            </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-line bg-lumen-deep/40 p-4">

@@ -29,6 +29,17 @@ describe('silent failure cue', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
+  it('stays silent when the cue sound is muted', () => {
+    const target = new EventTarget()
+    const AudioContextMock = vi.fn()
+    Object.assign(target, { AudioContext: AudioContextMock })
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('navigator', { vibrate: vi.fn() })
+
+    expect(() => playSilentFailureCue({ muted: true })).not.toThrow()
+    expect(AudioContextMock).not.toHaveBeenCalled()
+  })
+
   it('still emits the visual cue when vibration is unavailable', () => {
     const target = new EventTarget()
     vi.stubGlobal('window', target)
